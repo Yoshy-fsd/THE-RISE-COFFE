@@ -100,7 +100,7 @@ const defaultSettings = {
   waiterPassword: DEFAULT_WAITER_PASSWORD,
   waiters: DEFAULT_WAITERS,
   ownerInstagramUrl: DEFAULT_OWNER_INSTAGRAM,
-  wifiRestrictionEnabled: true,
+  wifiRestrictionEnabled: false,
 };
 
 function readStorage(key, fallback) {
@@ -611,13 +611,21 @@ function WaiterAuth({ waiters, onUnlock, error }) {
   );
 }
 
-function WaiterView({ waiterName, settings, orders, onOrderStatusChange }) {
+function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warningMessage }) {
   const shiftStats = getWaiterShiftStats(orders);
   const activeOrders = orders.filter((order) => !['Served', 'Cancelled'].includes(order.status)).slice().reverse();
 
   return (
     <div className="admin-shell">
       <style>{styles}</style>
+      {warningMessage && (
+        <div className="auth-wrap" style={{ padding: '20px 0 0' }}>
+          <div className="auth-card network-blocked-card">
+            <h2>Welcome to {settings.name}</h2>
+            <p>{warningMessage}</p>
+          </div>
+        </div>
+      )}
       <header className="admin-topbar">
         <div>
           <h2>{waiterName} section</h2>
@@ -666,7 +674,7 @@ function WaiterView({ waiterName, settings, orders, onOrderStatusChange }) {
   );
 }
 
-function AdminView({ settings, groups, products, orders, feedback, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onOrdersChange, onSubmitFeedback }) {
+function AdminView({ settings, groups, products, orders, feedback, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onOrdersChange, onSubmitFeedback, warningMessage }) {
   const [draftSettings, setDraftSettings] = useState(settings);
   const [draftGroupName, setDraftGroupName] = useState('');
   const [draftProduct, setDraftProduct] = useState({ name: '', groupId: groups[0]?.id || '', price: 0, emoji: '☕', image: '', details: '', prepTime: 5, available: true });
@@ -682,6 +690,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const [networkInfo, setNetworkInfo] = useState({ detectedNetworks: [] });
   const [newQrName, setNewQrName] = useState('');
   const [newQrLink, setNewQrLink] = useState('');
+  const [productDrafts, setProductDrafts] = useState({});
   const [groupStyleDraft, setGroupStyleDraft] = useState({
     backgroundColor: groups[0]?.backgroundColor || '#f4efe8',
     backgroundImage: groups[0]?.backgroundImage || '',
@@ -691,6 +700,16 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   useEffect(() => {
     setDraftSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    setProductDrafts((current) => {
+      const next = {};
+      products.forEach((product) => {
+        next[product.id] = { ...(current[product.id] || product), ...product };
+      });
+      return next;
+    });
+  }, [products]);
 
   useEffect(() => {
     fetchNetworkInfo().then(setNetworkInfo).catch(() => {});
@@ -874,7 +893,16 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   };
 
   const updateProduct = (productId, patch) => {
-    onProductsChange(products.map((product) => (product.id === productId ? { ...product, ...patch } : product)));
+    setProductDrafts((current) => ({
+      ...current,
+      [productId]: { ...(current[productId] || products.find((product) => product.id === productId) || {}), ...patch },
+    }));
+  };
+
+  const saveProductEdits = (productId) => {
+    const draft = productDrafts[productId];
+    if (!draft) return;
+    onProductsChange(products.map((product) => (product.id === productId ? { ...product, ...draft } : product)));
   };
 
   const removeProduct = (productId) => {
@@ -908,6 +936,14 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   return (
     <div className="admin-shell">
       <style>{styles}</style>
+      {warningMessage && (
+        <div className="auth-wrap" style={{ padding: '20px 0 0' }}>
+          <div className="auth-card network-blocked-card">
+            <h2>Welcome to {settings.name}</h2>
+            <p>{warningMessage}</p>
+          </div>
+        </div>
+      )}
       <header className="admin-topbar">
         <div>
           <h2>Admin dashboard</h2>
@@ -965,7 +1001,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
             {!ownerEditUnlocked && <div className="owner-code-row"><input type="password" value={ownerCode} onChange={(e) => setOwnerCode(e.target.value)} placeholder="Owner code" /><button className="ghost-btn" onClick={unlockOwnerInstagram}>Unlock</button></div>}
             {ownerMessage && <small className={ownerMessage === 'Incorrect owner code.' ? 'error-text' : 'form-message'}>{ownerMessage}</small>}
             <label>Allowed coffee Wi-Fi network<input value={draftSettings.allowedWifiNetwork || ''} onChange={(e) => setDraftSettings({ ...draftSettings, allowedWifiNetwork: e.target.value })} placeholder="Example: 192.168.1" /></label>
-            <label className="switch-label"><input type="checkbox" checked={draftSettings.wifiRestrictionEnabled !== false} onChange={(e) => setDraftSettings({ ...draftSettings, wifiRestrictionEnabled: e.target.checked })} /> Restrict website to coffee Wi-Fi</label>
+            <label className="switch-label"><input type="checkbox" checked={draftSettings.wifiRestrictionEnabled === true} onChange={(e) => setDraftSettings({ ...draftSettings, wifiRestrictionEnabled: e.target.checked })} /> Restrict website to coffee Wi-Fi</label>
             <small className="field-help">Detected network: {networkInfo.detectedNetworks?.length ? networkInfo.detectedNetworks.join(', ') : 'not available'}. Enter the first three numbers, such as 192.168.1, then save branding.</small>
             <label>Accent color<input type="color" value={draftSettings.accent} onChange={(e) => setDraftSettings({ ...draftSettings, accent: e.target.value })} /></label>
             <label>Background color<input type="color" value={draftSettings.background} onChange={(e) => setDraftSettings({ ...draftSettings, background: e.target.value })} /></label>
@@ -1077,20 +1113,26 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           <button className="primary-btn" onClick={saveProduct}>Add product</button>
 
           <div className="product-editor-list">
-            {products.map((product) => (
-              <div key={product.id} className="product-editor-item">
-                <div className="product-mini-art">{product.image ? <img src={product.image} alt={product.name} /> : <span>{product.emoji || '☕'}</span>}</div>
-                <div className="product-edit-fields">
-                  <input value={product.name} onChange={(e) => updateProduct(product.id, { name: e.target.value })} />
-                  <input type="number" value={product.price} onChange={(e) => updateProduct(product.id, { price: Number(e.target.value) })} />
-                  <input type="number" value={product.prepTime || 5} onChange={(e) => updateProduct(product.id, { prepTime: Number(e.target.value) })} />
-                  <input value={product.image || ''} onChange={(e) => updateProduct(product.id, { image: e.target.value })} placeholder="Image URL" />
-                  <label>Upload photo<input type="file" accept="image/*" onChange={(event) => handleProductImageUpload(product.id, event)} /></label>
-                  <label className="availability-toggle"><input type="checkbox" checked={product.available !== false} onChange={(e) => updateProduct(product.id, { available: e.target.checked })} /> Available</label>
+            {products.map((product) => {
+              const draft = productDrafts[product.id] || product;
+              return (
+                <div key={product.id} className="product-editor-item">
+                  <div className="product-mini-art">{draft.image ? <img src={draft.image} alt={draft.name} /> : <span>{draft.emoji || '☕'}</span>}</div>
+                  <div className="product-edit-fields">
+                    <input value={draft.name} onChange={(e) => updateProduct(product.id, { name: e.target.value })} />
+                    <input type="number" value={draft.price} onChange={(e) => updateProduct(product.id, { price: Number(e.target.value) })} />
+                    <input type="number" value={draft.prepTime || 5} onChange={(e) => updateProduct(product.id, { prepTime: Number(e.target.value) })} />
+                    <input value={draft.image || ''} onChange={(e) => updateProduct(product.id, { image: e.target.value })} placeholder="Image URL" />
+                    <label>Upload photo<input type="file" accept="image/*" onChange={(event) => handleProductImageUpload(product.id, event)} /></label>
+                    <label className="availability-toggle"><input type="checkbox" checked={draft.available !== false} onChange={(e) => updateProduct(product.id, { available: e.target.checked })} /> Available</label>
+                  </div>
+                  <div className="product-edit-actions">
+                    <button className="primary-btn" onClick={() => saveProductEdits(product.id)}>Save</button>
+                    <button className="danger-btn" onClick={() => removeProduct(product.id)}>Delete</button>
+                  </div>
                 </div>
-                <button className="danger-btn" onClick={() => removeProduct(product.id)}>Delete</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -1303,12 +1345,16 @@ export default function App() {
     setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, status } : order)));
   };
 
-  if (networkAllowed === false) {
+  const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';
+  const isStaffView = currentView === 'admin' || currentView === 'waiter';
+  const wifiRestricted = settings.wifiRestrictionEnabled === true;
+
+  if (wifiRestricted && networkAllowed === false && !isStaffView) {
     return (
       <div className="auth-wrap">
         <div className="auth-card network-blocked-card">
           <h2>Welcome to {settings.name}</h2>
-          <p>This ordering page works only while connected to the coffee shop Wi-Fi.</p>
+          <p>{wifiWarningMessage}</p>
           <button onClick={() => window.location.reload()}>Check connection again</button>
         </div>
       </div>
@@ -1332,9 +1378,10 @@ export default function App() {
       onOrderStatusChange={changeOrderStatus}
       onOrdersChange={setOrders}
       onSubmitFeedback={submitFeedback}
+      warningMessage={networkAllowed === false ? wifiWarningMessage : ''}
     />
   ) : currentView === 'waiter' ? (
-    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} />
+    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} warningMessage={networkAllowed === false ? wifiWarningMessage : ''} />
   ) : (
     <CustomerView
       settings={settings}
