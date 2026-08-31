@@ -1279,7 +1279,7 @@ export default function App() {
     const refreshOrders = () => {
       fetchSharedData()
         .then((data) => {
-          if (data?.orders) setOrders(data.orders);
+          if (data?.orders) setOrders(data.orders.map(normalizeOrder));
         })
         .catch(() => {});
     };
@@ -1319,9 +1319,14 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      setCurrentView(hash === 'admin' || hash === 'waiter' ? hash : 'customer');
-      setIsAdmin(false);
-      setIsWaiter(false);
+      const nextView = hash === 'admin' || hash === 'waiter' ? hash : 'customer';
+      setCurrentView(nextView);
+
+      if (nextView === 'customer') {
+        setIsAdmin(false);
+        setIsWaiter(false);
+        setActiveWaiter(null);
+      }
       setAuthError('');
     };
 
