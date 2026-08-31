@@ -6,6 +6,7 @@ const ADMIN_FULL_ACCESS_CODE = '2000';
 const DEFAULT_WAITER_PASSWORD = '667788';
 const OWNER_INSTAGRAM_CODE = '2005926';
 const DEFAULT_OWNER_INSTAGRAM = 'https://www.instagram.com/neder_shh/';
+const COFFEE_LOCATION_URL = 'https://maps.app.goo.gl/E3ksF3ywTqd6DWQT7';
 const DEFAULT_WAITERS = [{ id: 'waiter-1', name: 'Waiter', password: DEFAULT_WAITER_PASSWORD }];
 const STORAGE_KEYS = {
   settings: 'coffee-menu-settings-v1',
@@ -90,6 +91,7 @@ const defaultSettings = {
   background: '#e9f0e1',
   textColor: '#1f2f20',
   instagram: '@tabacandbloom',
+  facebookUrl: '',
   logoText: 'T&B',
   logoUrl: '',
   allowedWifiNetwork: '',
@@ -201,6 +203,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const [comment, setComment] = useState('');
   const [toast, setToast] = useState('');
   const table = getTableFromUrl();
+  const canOrder = Boolean(table);
   const customerOrderIds = readStorage('coffee-menu-customer-orders-v1', []);
   const customerOrders = orders
     .filter((order) => table
@@ -243,6 +246,10 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   }, [toast]);
 
   const addToCart = (product) => {
+    if (!canOrder) {
+      setToast('Scan your table QR code to order.');
+      return;
+    }
     setCart((current) => {
       const existing = current.find((item) => item.id === product.id);
       if (existing) {
@@ -266,7 +273,10 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const totalPrep = cart.reduce((sum, item) => sum + Number(item.prepTime || 5) * item.qty, 0);
 
   const handlePlaceOrder = () => {
-    if (!cart.length) return;
+    if (!cart.length || !canOrder) {
+      if (!canOrder) setToast('Scan your table QR code to order.');
+      return;
+    }
     const order = {
       id: makeId('order'),
       table: table || 'Walk-in',
@@ -311,6 +321,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
 
       <div className="customer-main">
         <aside className="cart-panel">
+          {!canOrder && <div className="scan-notice">Browse the menu freely. Scan your table QR code to order.</div>}
           <div className="panel-head">
             <h3>Your order</h3>
             <span>{cart.reduce((sum, item) => sum + item.qty, 0)} items</span>
@@ -344,7 +355,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
             <span>Total</span>
             <strong>{settings.currency}{total.toFixed(2)}</strong>
           </div>
-          <button className="place-order" onClick={handlePlaceOrder} disabled={!cart.length}>Send order</button>
+          <button className="place-order" onClick={handlePlaceOrder} disabled={!cart.length || !canOrder}>Send order</button>
 
           <div className="order-status-panel">
               <div className="panel-head">
@@ -409,6 +420,16 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
             </svg>
             <span>Website by @neder_shh</span>
           </a>
+          <a className="social-link location-link" href={COFFEE_LOCATION_URL} target="_blank" rel="noreferrer">
+            <span className="social-icon" aria-hidden="true">⌖</span>
+            <span>Find us at the coffee shop</span>
+          </a>
+          {settings.facebookUrl && (
+            <a className="social-link facebook-link" href={settings.facebookUrl} target="_blank" rel="noreferrer" aria-label="Open the coffee shop Facebook page">
+              <span className="facebook-icon" aria-hidden="true">f</span>
+              <span>Facebook</span>
+            </a>
+          )}
         </aside>
 
         <main className="menu-panel">
@@ -454,8 +475,8 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
                         </div>
                         <p>{product.details || 'Freshly prepared for you.'}</p>
                         <div className="meta-row">
-                          <span>⏱ {product.prepTime || 5} min</span>
-                          <button onClick={() => addToCart(product)}>Add</button>
+                          <span>{product.available === false ? 'Not available for now' : `⏱ ${product.prepTime || 5} min`}</span>
+                          <button onClick={() => addToCart(product)} disabled={!canOrder || product.available === false}>{product.available === false ? 'Unavailable' : 'Add'}</button>
                         </div>
                       </div>
                     </article>
@@ -645,10 +666,10 @@ function WaiterView({ waiterName, settings, orders, onOrderStatusChange }) {
   );
 }
 
-function AdminView({ settings, groups, products, orders, feedback, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onSubmitFeedback }) {
+function AdminView({ settings, groups, products, orders, feedback, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onOrdersChange, onSubmitFeedback }) {
   const [draftSettings, setDraftSettings] = useState(settings);
   const [draftGroupName, setDraftGroupName] = useState('');
-  const [draftProduct, setDraftProduct] = useState({ name: '', groupId: groups[0]?.id || '', price: 0, emoji: '☕', image: '', details: '', prepTime: 5 });
+  const [draftProduct, setDraftProduct] = useState({ name: '', groupId: groups[0]?.id || '', price: 0, emoji: '☕', image: '', details: '', prepTime: 5, available: true });
   const [selectedGroupId, setSelectedGroupId] = useState(groups[0]?.id || '');
   const [brandingMessage, setBrandingMessage] = useState('');
   const [statsPeriod, setStatsPeriod] = useState('day');
@@ -659,6 +680,8 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const [ownerCode, setOwnerCode] = useState('');
   const [ownerMessage, setOwnerMessage] = useState('');
   const [networkInfo, setNetworkInfo] = useState({ detectedNetworks: [] });
+  const [newQrName, setNewQrName] = useState('');
+  const [newQrLink, setNewQrLink] = useState('');
   const [groupStyleDraft, setGroupStyleDraft] = useState({
     backgroundColor: groups[0]?.backgroundColor || '#f4efe8',
     backgroundImage: groups[0]?.backgroundImage || '',
@@ -708,6 +731,25 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
     onSettingsChange(nextSettings);
     setDraftSettings(nextSettings);
     setStatsPeriod('day');
+  };
+
+  const deleteOrder = (orderId) => {
+    if (window.confirm('Delete this order permanently? It will also be removed from sales statistics.')) {
+      onOrdersChange(orders.filter((order) => order.id !== orderId));
+    }
+  };
+
+  const deleteSelectedPeriodOrders = () => {
+    const { start, end } = getStatsRange(statsPeriod, statsDate, settings.statsDayStartedAt);
+    const selectedOrders = orders.filter((order) => {
+      const createdAt = new Date(order.createdAt);
+      return createdAt >= start && createdAt < end;
+    });
+    if (!selectedOrders.length) return;
+    if (window.confirm(`Delete ${selectedOrders.length} order(s) from the selected ${statsPeriod}? This also removes their money from the dashboard.`)) {
+      const selectedIds = new Set(selectedOrders.map((order) => order.id));
+      onOrdersChange(orders.filter((order) => !selectedIds.has(order.id)));
+    }
   };
 
   const waiters = settings.waiters || [{ id: 'waiter-1', name: settings.waiterName || 'Waiter', password: settings.waiterPassword || DEFAULT_WAITER_PASSWORD }];
@@ -779,6 +821,38 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
     reader.readAsDataURL(file);
   };
 
+  const handleProductImageUpload = (productId, event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setBrandingMessage('Only image files are allowed for product photos.');
+      event.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      updateProduct(productId, { image: result });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleNewProductImageUpload = (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setBrandingMessage('Only image files are allowed for product photos.');
+      event.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      setDraftProduct((current) => ({ ...current, image: result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const saveProduct = () => {
     if (!draftProduct.name.trim()) return;
     const next = [
@@ -792,10 +866,11 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
         image: draftProduct.image || '',
         details: draftProduct.details || '',
         prepTime: Number(draftProduct.prepTime || 5),
+        available: draftProduct.available !== false,
       },
     ];
     onProductsChange(next);
-    setDraftProduct({ name: '', groupId: groups[0]?.id || '', price: 0, emoji: '☕', image: '', details: '', prepTime: 5 });
+    setDraftProduct({ name: '', groupId: groups[0]?.id || '', price: 0, emoji: '☕', image: '', details: '', prepTime: 5, available: true });
   };
 
   const updateProduct = (productId, patch) => {
@@ -807,6 +882,28 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   };
 
   const menuBaseUrl = new URL('./', window.location.href).href;
+  const tableQrLinks = draftSettings.tableQrLinks || {};
+  const customQrCodes = draftSettings.customQrCodes || [];
+
+  const getTableUrl = (table) => tableQrLinks[table] || `${menuBaseUrl}?table=${table}`;
+
+  const updateTableQrLink = (table, link) => {
+    setDraftSettings((current) => ({ ...current, tableQrLinks: { ...(current.tableQrLinks || {}), [table]: link } }));
+  };
+
+  const addCustomQrCode = () => {
+    if (!newQrName.trim() || !newQrLink.trim()) return;
+    setDraftSettings((current) => ({
+      ...current,
+      customQrCodes: [...(current.customQrCodes || []), { id: makeId('qr'), name: newQrName.trim(), link: newQrLink.trim() }],
+    }));
+    setNewQrName('');
+    setNewQrLink('');
+  };
+
+  const removeCustomQrCode = (qrId) => {
+    setDraftSettings((current) => ({ ...current, customQrCodes: (current.customQrCodes || []).filter((qr) => qr.id !== qrId) }));
+  };
 
   return (
     <div className="admin-shell">
@@ -844,6 +941,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
             <div className="stat-box"><small>Items sold</small><strong>{salesStats.itemCount}</strong></div>
             <div className="stat-box"><small>Top item</small><strong>{salesStats.topItem ? `${salesStats.topItem[0]} (${salesStats.topItem[1]})` : 'No sales yet'}</strong></div>
           </div>
+          <button className="danger-btn dashboard-delete-btn" onClick={deleteSelectedPeriodOrders} disabled={!salesStats.orderCount}>Delete selected period orders</button>
         </section>
 
         <section className="admin-card">
@@ -855,6 +953,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
             <label>Shop name<input value={draftSettings.name} onChange={(e) => setDraftSettings({ ...draftSettings, name: e.target.value })} /></label>
             <label>Tagline<input value={draftSettings.tagline} onChange={(e) => setDraftSettings({ ...draftSettings, tagline: e.target.value })} /></label>
             <label>Instagram<a href="https://instagram.com" target="_blank" rel="noreferrer">@</a><input value={draftSettings.instagram} onChange={(e) => setDraftSettings({ ...draftSettings, instagram: e.target.value })} /></label>
+            <label>Facebook page URL<input value={draftSettings.facebookUrl || ''} onChange={(e) => setDraftSettings({ ...draftSettings, facebookUrl: e.target.value })} placeholder="https://facebook.com/your-page" /></label>
             <label>Logo text<input value={draftSettings.logoText} onChange={(e) => setDraftSettings({ ...draftSettings, logoText: e.target.value })} /></label>
             <label>Logo image URL<input value={draftSettings.logoUrl} onChange={(e) => setDraftSettings({ ...draftSettings, logoUrl: e.target.value })} /></label>
             <label>Upload logo photo<input type="file" accept="image/*" onChange={handleLogoImageUpload} /></label>
@@ -898,15 +997,35 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           <div className="qr-grid">
             {Array.from({ length: 20 }, (_, index) => {
               const table = index + 1;
-              const tableUrl = `${menuBaseUrl}?table=${table}`;
+              const tableUrl = getTableUrl(table);
               const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(tableUrl)}`;
               return (
                 <div key={table} className="qr-box">
                   <img src={qrUrl} alt={`Table ${table} QR`} />
                   <span>Table {table}</span>
+                  <input value={tableUrl} onChange={(event) => updateTableQrLink(table, event.target.value)} aria-label={`Table ${table} QR link`} />
                 </div>
               );
             })}
+          </div>
+          <div className="custom-qr-editor">
+            <h4>Additional QR codes</h4>
+            <div className="field-row">
+              <input value={newQrName} onChange={(event) => setNewQrName(event.target.value)} placeholder="QR name" />
+              <input value={newQrLink} onChange={(event) => setNewQrLink(event.target.value)} placeholder="Destination link" />
+              <button className="primary-btn" onClick={addCustomQrCode}>Add QR</button>
+            </div>
+            <div className="qr-grid">
+              {customQrCodes.map((qr) => (
+                <div key={qr.id} className="qr-box">
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qr.link)}`} alt={`${qr.name} QR`} />
+                  <span>{qr.name}</span>
+                  <input value={qr.link} onChange={(event) => setDraftSettings((current) => ({ ...current, customQrCodes: (current.customQrCodes || []).map((item) => item.id === qr.id ? { ...item, link: event.target.value } : item) }))} aria-label={`${qr.name} link`} />
+                  <button className="danger-btn" onClick={() => removeCustomQrCode(qr.id)}>Remove</button>
+                </div>
+              ))}
+            </div>
+            <button className="primary-btn" onClick={saveSettings}>Save QR links</button>
           </div>
         </section>
 
@@ -950,8 +1069,10 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
             <input type="number" min="0" step="0.01" placeholder="Price" value={draftProduct.price} onChange={(e) => setDraftProduct({ ...draftProduct, price: Number(e.target.value) })} />
             <input placeholder="Emoji (☕)" value={draftProduct.emoji} onChange={(e) => setDraftProduct({ ...draftProduct, emoji: e.target.value })} />
             <input placeholder="Image URL" value={draftProduct.image} onChange={(e) => setDraftProduct({ ...draftProduct, image: e.target.value })} />
+            <label>Upload product photo<input type="file" accept="image/*" onChange={handleNewProductImageUpload} /></label>
             <input type="number" min="1" step="1" placeholder="Prep min" value={draftProduct.prepTime} onChange={(e) => setDraftProduct({ ...draftProduct, prepTime: Number(e.target.value) })} />
             <textarea placeholder="Product details" value={draftProduct.details} onChange={(e) => setDraftProduct({ ...draftProduct, details: e.target.value })} />
+            <label className="availability-toggle"><input type="checkbox" checked={draftProduct.available} onChange={(e) => setDraftProduct({ ...draftProduct, available: e.target.checked })} /> Available now</label>
           </div>
           <button className="primary-btn" onClick={saveProduct}>Add product</button>
 
@@ -964,6 +1085,8 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
                   <input type="number" value={product.price} onChange={(e) => updateProduct(product.id, { price: Number(e.target.value) })} />
                   <input type="number" value={product.prepTime || 5} onChange={(e) => updateProduct(product.id, { prepTime: Number(e.target.value) })} />
                   <input value={product.image || ''} onChange={(e) => updateProduct(product.id, { image: e.target.value })} placeholder="Image URL" />
+                  <label>Upload photo<input type="file" accept="image/*" onChange={(event) => handleProductImageUpload(product.id, event)} /></label>
+                  <label className="availability-toggle"><input type="checkbox" checked={product.available !== false} onChange={(e) => updateProduct(product.id, { available: e.target.checked })} /> Available</label>
                 </div>
                 <button className="danger-btn" onClick={() => removeProduct(product.id)}>Delete</button>
               </div>
@@ -998,6 +1121,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
                       <option value="Served">Served</option>
                       <option value="Cancelled">Cancelled</option>
                     </select>
+                    <button className="danger-btn" onClick={() => deleteOrder(order.id)}>Delete</button>
                   </div>
                 </div>
               ))}
@@ -1206,6 +1330,7 @@ export default function App() {
       onGroupsChange={setGroups}
       onProductsChange={setProducts}
       onOrderStatusChange={changeOrderStatus}
+      onOrdersChange={setOrders}
       onSubmitFeedback={submitFeedback}
     />
   ) : currentView === 'waiter' ? (
@@ -1263,6 +1388,7 @@ const styles = `
   .qty-box button { width: 28px; height: 28px; border: none; border-radius: 10px; background: #e6eedf; cursor: pointer; }
   .cart-total { display: flex; justify-content: space-between; padding: 14px 0; border-top: 1px solid rgba(24,42,27,0.08); }
   .place-order { width: 100%; margin-top: 16px; }
+  .scan-notice { margin-bottom: 16px; padding: 11px 12px; border-radius: 12px; background: #f5e7c8; color: #664d1e; font-size: 0.85rem; font-weight: 700; }
   .order-status-panel { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(24,42,27,0.1); }
   .customer-order-list { display: grid; gap: 10px; margin-top: 12px; }
   .customer-order-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; background: rgba(126,168,107,0.1); }
@@ -1278,6 +1404,13 @@ const styles = `
   .owner-instagram-link { color: #36506d; background: #e2ebf5; }
   .owner-instagram-link:hover { background: #d2e1f0; }
   .instagram-icon { width: 22px; height: 22px; }
+  .social-link { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 10px; padding: 11px 12px; border-radius: 12px; font-weight: 800; transition: 0.2s ease; }
+  .location-link { color: #69552c; background: #f5edcf; }
+  .location-link:hover { background: #eee2b5; transform: translateY(-1px); }
+  .facebook-link { color: #234f91; background: #e1eafa; }
+  .facebook-link:hover { background: #d0ddf3; transform: translateY(-1px); }
+  .social-icon, .facebook-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; font-size: 1.15rem; }
+  .facebook-icon { color: white; background: #1877f2; font-family: Arial, sans-serif; }
   .menu-panel { padding: 18px; }
   .search-row input, .admin-card input, .admin-card textarea, .admin-card select { width: 100%; border: 1px solid rgba(24,42,27,0.14); border-radius: 12px; padding: 0.8rem 0.9rem; background: rgba(255,255,255,0.72); }
   .search-row input { font-size: 1rem; }
@@ -1299,6 +1432,7 @@ const styles = `
   .card-body p { color: rgba(24,42,27,0.7); margin: 8px 0; min-height: 42px; }
   .meta-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .meta-row button { border: none; background: #1c2a1d; color: white; padding: 0.65rem 0.9rem; border-radius: 10px; cursor: pointer; }
+  .meta-row button:disabled, .place-order:disabled { cursor: not-allowed; opacity: 0.45; }
   .feedback-section { margin-top: 30px; }
   .rating-box { margin-top: 14px; background: rgba(24,42,27,0.03); border: 1px solid rgba(24,42,27,0.08); border-radius: 16px; padding: 16px; }
   .stars { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -1337,6 +1471,7 @@ const styles = `
   .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .stat-box { min-height: 92px; padding: 14px; border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; background: rgba(255,255,255,0.08); }
   .stat-box strong { display: block; margin-top: 10px; font-size: 1.25rem; overflow-wrap: anywhere; }
+  .dashboard-delete-btn { margin-top: 14px; }
   .waiter-summary { max-width: 1400px; margin: 0 auto 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 12px; }
   .waiter-summary .stat-box { background: #1c2a1d; color: white; }
   .waiter-summary .stat-box small { color: rgba(255,255,255,0.7); }
@@ -1365,11 +1500,20 @@ const styles = `
   .group-editor-actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .product-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; }
   .product-form-grid textarea { grid-column: 1 / -1; min-height: 90px; }
+  .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-top: 14px; }
+  .qr-box { display: grid; gap: 8px; align-content: start; padding: 10px; border: 1px solid rgba(24,42,27,0.1); border-radius: 14px; background: rgba(255,255,255,0.5); text-align: center; }
+  .qr-box img { width: 140px; height: 140px; margin: 0 auto; }
+  .qr-box span { font-weight: 800; }
+  .qr-box input { min-width: 0; font-size: 0.75rem; }
+  .custom-qr-editor { margin-top: 20px; padding-top: 18px; border-top: 1px solid rgba(24,42,27,0.1); }
+  .custom-qr-editor h4 { margin: 0 0 12px; }
   .product-editor-list { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
   .product-editor-item { display: grid; grid-template-columns: 74px minmax(0, 1fr) 100px; gap: 12px; align-items: center; border: 1px solid rgba(24,42,27,0.08); border-radius: 14px; padding: 10px; background: rgba(255,255,255,0.45); }
   .product-mini-art { width: 74px; height: 74px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(135deg, #e6efdd, #dfe8cd); font-size: 2rem; overflow: hidden; }
   .product-mini-art img { width: 100%; height: 100%; object-fit: cover; }
   .product-edit-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .availability-toggle { display: flex; align-items: center; gap: 7px; font-size: 0.85rem; font-weight: 700; }
+  .availability-toggle input { width: auto; }
   .danger-btn { background: #a74444; color: white; }
   .qr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; margin-top: 14px; }
   .qr-box { background: rgba(255,255,255,0.7); border: 1px solid rgba(24,42,27,0.08); border-radius: 12px; padding: 8px; text-align: center; }

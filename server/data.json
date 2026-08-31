@@ -7,6 +7,7 @@
     "background": "#e9f0e1",
     "textColor": "#1f2f20",
     "instagram": "@tabacandbloom",
+    "facebookUrl": "",
     "logoText": "T&B",
     "logoUrl": "",
     "allowedWifiNetwork": "",
@@ -22,7 +23,7 @@
     ],
     "ownerInstagramUrl": "https://www.instagram.com/neder_shh/",
     "wifiRestrictionEnabled": true,
-    "statsDayStartedAt": "2026-08-31T10:21:21.552Z"
+    "statsDayStartedAt": "2026-08-31T12:45:33.610Z"
   },
   "groups": [
     {
@@ -593,171 +594,6 @@
       "prepTime": 9
     }
   ],
-  "orders": [
-    {
-      "id": "order-9o7wfm2x-mtgje8df",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-21",
-          "name": "Frappucino Classic",
-          "qty": 2,
-          "price": 28,
-          "prepTime": 7
-        },
-        {
-          "id": "p-23",
-          "name": "Frappucino Nutella",
-          "qty": 2,
-          "price": 32,
-          "prepTime": 7
-        },
-        {
-          "id": "p-28",
-          "name": "Red Mojito",
-          "qty": 2,
-          "price": 26,
-          "prepTime": 5
-        },
-        {
-          "id": "p-29",
-          "name": "Blue Mojito",
-          "qty": 2,
-          "price": 27,
-          "prepTime": 5
-        }
-      ],
-      "total": 226,
-      "prepMinutes": 48,
-      "createdAt": "2026-08-31T01:05:33.411Z",
-      "status": "Cancelled"
-    },
-    {
-      "id": "order-6xuvbgso-mth2varq",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-4",
-          "name": "Americano",
-          "qty": 1,
-          "price": 16,
-          "prepTime": 4
-        },
-        {
-          "id": "p-5",
-          "name": "Machhiato",
-          "qty": 1,
-          "price": 17,
-          "prepTime": 4
-        }
-      ],
-      "total": 33,
-      "prepMinutes": 8,
-      "createdAt": "2026-08-31T10:10:42.374Z",
-      "status": "Cancelled"
-    },
-    {
-      "id": "order-swmemkev-mth2w92j",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-2",
-          "name": "Latté",
-          "qty": 1,
-          "price": 18,
-          "prepTime": 5
-        }
-      ],
-      "total": 18,
-      "prepMinutes": 5,
-      "createdAt": "2026-08-31T10:11:26.827Z",
-      "status": "Cancelled"
-    },
-    {
-      "id": "order-4zjbama5-mth2ye76",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-2",
-          "name": "Latté",
-          "qty": 1,
-          "price": 18,
-          "prepTime": 5
-        }
-      ],
-      "total": 18,
-      "prepMinutes": 5,
-      "createdAt": "2026-08-31T10:13:06.786Z",
-      "status": "Cancelled"
-    },
-    {
-      "id": "order-8a6o6sl9-mth30vr8",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-1",
-          "name": "Espresso",
-          "qty": 1,
-          "price": 14,
-          "prepTime": 3
-        }
-      ],
-      "total": 14,
-      "prepMinutes": 3,
-      "createdAt": "2026-08-31T10:15:02.853Z",
-      "status": "Served"
-    },
-    {
-      "id": "order-9cuamz4o-mtgkp1no",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-1",
-          "name": "Espresso",
-          "qty": 1,
-          "price": 14,
-          "prepTime": 3
-        }
-      ],
-      "total": 14,
-      "prepMinutes": 3,
-      "createdAt": "2026-08-31T01:41:57.541Z",
-      "status": "Cancelled"
-    },
-    {
-      "id": "order-x4vxqi9j-mth7918n",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-2",
-          "name": "Latté",
-          "qty": 1,
-          "price": 18,
-          "prepTime": 5
-        }
-      ],
-      "total": 18,
-      "prepMinutes": 5,
-      "createdAt": "2026-08-31T12:13:21.671Z",
-      "status": "Received"
-    },
-    {
-      "id": "order-5ts03uy9-mth7cu5v",
-      "table": "Walk-in",
-      "items": [
-        {
-          "id": "p-11",
-          "name": "Ice Thé Mango",
-          "qty": 1,
-          "price": 22,
-          "prepTime": 5
-        }
-      ],
-      "total": 22,
-      "prepMinutes": 5,
-      "createdAt": "2026-08-31T12:16:19.123Z",
-      "status": "Preparing"
-    }
-  ],
+  "orders": [],
   "feedback": []
 }
