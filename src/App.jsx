@@ -137,6 +137,16 @@ function formatTimeAgo(dateString) {
   return `${diff} min ago`;
 }
 
+function normalizeOrderStatus(status) {
+  const allowed = new Set(['New', 'Received', 'Preparing', 'Ready', 'Served', 'Cancelled']);
+  const next = String(status || 'New');
+  return allowed.has(next) ? next : 'New';
+}
+
+function normalizeOrder(order) {
+  return { ...order, status: normalizeOrderStatus(order?.status) };
+}
+
 function getLocalDateInputValue(date = new Date()) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
@@ -206,6 +216,8 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const canOrder = Boolean(table);
   const customerOrderIds = readStorage('coffee-menu-customer-orders-v1', []);
   const customerOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => order.status !== 'Cancelled')
     .filter((order) => table
       ? String(order.table) === String(table)
       : customerOrderIds.includes(order.id))
@@ -613,7 +625,11 @@ function WaiterAuth({ waiters, onUnlock, error }) {
 
 function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warningMessage }) {
   const shiftStats = getWaiterShiftStats(orders);
-  const activeOrders = orders.filter((order) => !['Served', 'Cancelled'].includes(order.status)).slice().reverse();
+  const activeOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => !['Served', 'Cancelled'].includes(order.status))
+    .slice()
+    .reverse();
 
   return (
     <div className="admin-shell">
@@ -1142,31 +1158,36 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
             <div className="empty-state">No orders yet.</div>
           ) : (
             <div className="orders-list">
-              {orders.slice().reverse().map((order) => (
-                <div key={order.id} className="order-item">
-                  <div className="order-item-head">
-                    <strong>{order.table === 'Walk-in' ? 'Walk-in' : `Table ${order.table}`}</strong>
-                    <span>{formatTimeAgo(order.createdAt)}</span>
+              {orders
+                .map(normalizeOrder)
+                .filter((order) => order.status !== 'Cancelled')
+                .slice()
+                .reverse()
+                .map((order) => (
+                  <div key={order.id} className="order-item">
+                    <div className="order-item-head">
+                      <strong>{order.table === 'Walk-in' ? 'Walk-in' : `Table ${order.table}`}</strong>
+                      <span>{formatTimeAgo(order.createdAt)}</span>
+                    </div>
+                    <ul>
+                      {order.items.map((item) => (
+                        <li key={`${order.id}-${item.id}`}>{item.qty} × {item.name}</li>
+                      ))}
+                    </ul>
+                    <div className="order-actions">
+                      <span>{settings.currency}{Number(order.total).toFixed(2)}</span>
+                      <select value={order.status} onChange={(e) => onOrderStatusChange(order.id, e.target.value)}>
+                        <option value="New">New</option>
+                        <option value="Received">Received</option>
+                        <option value="Preparing">Preparing</option>
+                        <option value="Ready">Ready</option>
+                        <option value="Served">Served</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                      <button className="danger-btn" onClick={() => deleteOrder(order.id)}>Delete</button>
+                    </div>
                   </div>
-                  <ul>
-                    {order.items.map((item) => (
-                      <li key={`${order.id}-${item.id}`}>{item.qty} × {item.name}</li>
-                    ))}
-                  </ul>
-                  <div className="order-actions">
-                    <span>{settings.currency}{Number(order.total).toFixed(2)}</span>
-                    <select value={order.status} onChange={(e) => onOrderStatusChange(order.id, e.target.value)}>
-                      <option value="New">New</option>
-                      <option value="Received">Received</option>
-                      <option value="Preparing">Preparing</option>
-                      <option value="Ready">Ready</option>
-                      <option value="Served">Served</option>
-                      <option value="Cancelled">Cancelled</option>
-                    </select>
-                    <button className="danger-btn" onClick={() => deleteOrder(order.id)}>Delete</button>
-                  </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </section>
@@ -1238,7 +1259,7 @@ export default function App() {
         if (data?.settings) setSettings({ ...defaultSettings, ...data.settings, wifiRestrictionEnabled: false });
         if (data?.groups) setGroups(data.groups);
         if (data?.products) setProducts(data.products);
-        if (data?.orders) setOrders(data.orders);
+        if (data?.orders) setOrders(data.orders.map(normalizeOrder));
         if (data?.feedback) setFeedback(data.feedback);
         setBackendReady(true);
       })
@@ -1310,7 +1331,7 @@ export default function App() {
   }, []);
 
   const placeOrder = (order) => {
-    setOrders((current) => [...current, order]);
+    setOrders((current) => [...current, normalizeOrder(order)]);
   };
 
   const submitFeedback = (entry) => {
@@ -1345,7 +1366,7 @@ export default function App() {
   };
 
   const changeOrderStatus = (orderId, status) => {
-    setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, status } : order)));
+    setOrders((current) => current.map((order) => (order.id === orderId ? normalizeOrder({ ...order, status }) : normalizeOrder(order))));
   };
 
   const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';

@@ -101,14 +101,29 @@ function ensureData() {
 function readData() {
   ensureData();
   try {
-    return JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+    const sanitized = {
+      ...parsed,
+      settings: {
+        ...(parsed.settings || {}),
+        wifiRestrictionEnabled: false,
+      },
+    };
+    return sanitized;
   } catch {
-    return JSON.parse(JSON.stringify(defaultData));
+    return JSON.parse(JSON.stringify({ ...defaultData, settings: { ...defaultData.settings, wifiRestrictionEnabled: false } }));
   }
 }
 
 function writeData(data) {
-  fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+  const cleaned = {
+    ...data,
+    settings: {
+      ...(data?.settings || {}),
+      wifiRestrictionEnabled: false,
+    },
+  };
+  fs.writeFileSync(dataFile, JSON.stringify(cleaned, null, 2));
 }
 
 const app = express();
@@ -137,6 +152,10 @@ function isOnCoffeeWifi(req) {
 }
 
 function requireCoffeeWifi(req, res, next) {
+  const data = readData();
+  if (data.settings?.wifiRestrictionEnabled === false) {
+    return next();
+  }
   if (!isOnCoffeeWifi(req)) {
     return res.status(403).json({ error: 'Connect to the coffee shop Wi-Fi to use this website.' });
   }
