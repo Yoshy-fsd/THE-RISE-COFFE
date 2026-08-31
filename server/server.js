@@ -21,7 +21,7 @@ const defaultData = {
     logoText: 'T&B',
     logoUrl: '',
     allowedWifiNetwork: '',
-    wifiRestrictionEnabled: true,
+    wifiRestrictionEnabled: false,
   },
   groups: [
     { id: 'g-classic-coffee', name: 'Classic Coffees', backgroundColor: '#f3e7d7', backgroundImage: '', textColor: '#211912' },

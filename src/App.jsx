@@ -100,7 +100,7 @@ const defaultSettings = {
   waiterPassword: DEFAULT_WAITER_PASSWORD,
   waiters: DEFAULT_WAITERS,
   ownerInstagramUrl: DEFAULT_OWNER_INSTAGRAM,
-  wifiRestrictionEnabled: true,
+  wifiRestrictionEnabled: false,
 };
 
 function readStorage(key, fallback) {
@@ -1001,7 +1001,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
             {!ownerEditUnlocked && <div className="owner-code-row"><input type="password" value={ownerCode} onChange={(e) => setOwnerCode(e.target.value)} placeholder="Owner code" /><button className="ghost-btn" onClick={unlockOwnerInstagram}>Unlock</button></div>}
             {ownerMessage && <small className={ownerMessage === 'Incorrect owner code.' ? 'error-text' : 'form-message'}>{ownerMessage}</small>}
             <label>Allowed coffee Wi-Fi network<input value={draftSettings.allowedWifiNetwork || ''} onChange={(e) => setDraftSettings({ ...draftSettings, allowedWifiNetwork: e.target.value })} placeholder="Example: 192.168.1" /></label>
-            <label className="switch-label"><input type="checkbox" checked={draftSettings.wifiRestrictionEnabled !== false} onChange={(e) => setDraftSettings({ ...draftSettings, wifiRestrictionEnabled: e.target.checked })} /> Restrict website to coffee Wi-Fi</label>
+            <label className="switch-label"><input type="checkbox" checked={draftSettings.wifiRestrictionEnabled === true} onChange={(e) => setDraftSettings({ ...draftSettings, wifiRestrictionEnabled: e.target.checked })} /> Restrict website to coffee Wi-Fi</label>
             <small className="field-help">Detected network: {networkInfo.detectedNetworks?.length ? networkInfo.detectedNetworks.join(', ') : 'not available'}. Enter the first three numbers, such as 192.168.1, then save branding.</small>
             <label>Accent color<input type="color" value={draftSettings.accent} onChange={(e) => setDraftSettings({ ...draftSettings, accent: e.target.value })} /></label>
             <label>Background color<input type="color" value={draftSettings.background} onChange={(e) => setDraftSettings({ ...draftSettings, background: e.target.value })} /></label>
@@ -1195,7 +1195,10 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
 }
 
 export default function App() {
-  const [settings, setSettings] = useState(() => readStorage(STORAGE_KEYS.settings, defaultSettings));
+  const [settings, setSettings] = useState(() => {
+    const saved = readStorage(STORAGE_KEYS.settings, defaultSettings);
+    return { ...defaultSettings, ...saved, wifiRestrictionEnabled: false };
+  });
   const [groups, setGroups] = useState(() => readStorage(STORAGE_KEYS.groups, baseGroups));
   const [products, setProducts] = useState(() => readStorage(STORAGE_KEYS.products, baseProducts.map(([name, groupId, price, emoji, prepTime, details], index) => ({
     id: `p-${index + 1}`,
@@ -1232,7 +1235,7 @@ export default function App() {
       .then((data) => {
         if (!mounted) return;
 
-        if (data?.settings) setSettings({ ...defaultSettings, ...data.settings });
+        if (data?.settings) setSettings({ ...defaultSettings, ...data.settings, wifiRestrictionEnabled: false });
         if (data?.groups) setGroups(data.groups);
         if (data?.products) setProducts(data.products);
         if (data?.orders) setOrders(data.orders);
@@ -1347,8 +1350,9 @@ export default function App() {
 
   const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';
   const isStaffView = currentView === 'admin' || currentView === 'waiter';
+  const wifiRestricted = settings.wifiRestrictionEnabled === true;
 
-  if (networkAllowed === false && !isStaffView) {
+  if (wifiRestricted && networkAllowed === false && !isStaffView) {
     return (
       <div className="auth-wrap">
         <div className="auth-card network-blocked-card">
@@ -1377,10 +1381,10 @@ export default function App() {
       onOrderStatusChange={changeOrderStatus}
       onOrdersChange={setOrders}
       onSubmitFeedback={submitFeedback}
-      warningMessage={networkAllowed === false ? wifiWarningMessage : ''}
+      warningMessage={wifiRestricted && networkAllowed === false ? wifiWarningMessage : ''}
     />
   ) : currentView === 'waiter' ? (
-    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} warningMessage={networkAllowed === false ? wifiWarningMessage : ''} />
+    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} warningMessage={wifiRestricted && networkAllowed === false ? wifiWarningMessage : ''} />
   ) : (
     <CustomerView
       settings={settings}
