@@ -577,7 +577,7 @@ function WaiterAuth({ waiters, onUnlock, error }) {
     <div className="auth-wrap">
       <div className="auth-card">
         <h2>Waiter access</h2>
-        <p>Enter the waiter password to receive incoming orders.</p>
+        <p>Enter the waiter password to receive and manage orders.</p>
         <select value={selectedWaiterId} onChange={(event) => setSelectedWaiterId(event.target.value)}>
           {waiters.map((waiter) => <option key={waiter.id} value={waiter.id}>{waiter.name}</option>)}
         </select>
@@ -591,7 +591,7 @@ function WaiterAuth({ waiters, onUnlock, error }) {
 
 function WaiterView({ waiterName, settings, orders, onOrderStatusChange }) {
   const shiftStats = getWaiterShiftStats(orders);
-  const activeOrders = orders.filter((order) => !['Received', 'Served', 'Cancelled'].includes(order.status)).slice().reverse();
+  const activeOrders = orders.filter((order) => !['Served', 'Cancelled'].includes(order.status)).slice().reverse();
 
   return (
     <div className="admin-shell">
@@ -624,6 +624,15 @@ function WaiterView({ waiterName, settings, orders, onOrderStatusChange }) {
                   <span>{settings.currency}{Number(order.total).toFixed(2)} · {order.status}</span>
                   <div className="waiter-order-buttons">
                     {order.status === 'New' && <button className="primary-btn" onClick={() => onOrderStatusChange(order.id, 'Received')}>Receive order</button>}
+                    {order.status !== 'New' && (
+                      <select value={order.status} onChange={(event) => onOrderStatusChange(order.id, event.target.value)} aria-label={`Change status for ${order.table}`}>
+                        <option value="Received">Received</option>
+                        <option value="Preparing">Preparing</option>
+                        <option value="Ready">Ready</option>
+                        <option value="Served">Served</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    )}
                   </div>
                 </div>
               </div>

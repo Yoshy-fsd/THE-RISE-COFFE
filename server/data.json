@@ -723,6 +723,40 @@
       "prepMinutes": 3,
       "createdAt": "2026-08-31T01:41:57.541Z",
       "status": "Cancelled"
+    },
+    {
+      "id": "order-x4vxqi9j-mth7918n",
+      "table": "Walk-in",
+      "items": [
+        {
+          "id": "p-2",
+          "name": "Latté",
+          "qty": 1,
+          "price": 18,
+          "prepTime": 5
+        }
+      ],
+      "total": 18,
+      "prepMinutes": 5,
+      "createdAt": "2026-08-31T12:13:21.671Z",
+      "status": "Received"
+    },
+    {
+      "id": "order-5ts03uy9-mth7cu5v",
+      "table": "Walk-in",
+      "items": [
+        {
+          "id": "p-11",
+          "name": "Ice Thé Mango",
+          "qty": 1,
+          "price": 22,
+          "prepTime": 5
+        }
+      ],
+      "total": 22,
+      "prepMinutes": 5,
+      "createdAt": "2026-08-31T12:16:19.123Z",
+      "status": "Preparing"
     }
   ],
   "feedback": []
