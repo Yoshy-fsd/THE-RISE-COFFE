@@ -98,12 +98,22 @@ function ensureData() {
   }
 }
 
+function normalizeStoredOrders(orders) {
+  if (!Array.isArray(orders)) return [];
+  return orders.map((order) => ({
+    ...order,
+    table: order?.table === 'Walk-in' || order?.table == null ? order?.table : String(order.table),
+    status: ['New', 'Received', 'Preparing', 'Ready', 'Served', 'Cancelled'].includes(String(order?.status || 'New')) ? String(order.status) : 'New',
+  }));
+}
+
 function readData() {
   ensureData();
   try {
     const parsed = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
     const sanitized = {
       ...parsed,
+      orders: normalizeStoredOrders(parsed.orders),
       settings: {
         ...(parsed.settings || {}),
         wifiRestrictionEnabled: false,
@@ -111,13 +121,14 @@ function readData() {
     };
     return sanitized;
   } catch {
-    return JSON.parse(JSON.stringify({ ...defaultData, settings: { ...defaultData.settings, wifiRestrictionEnabled: false } }));
+    return JSON.parse(JSON.stringify({ ...defaultData, settings: { ...defaultData.settings, wifiRestrictionEnabled: false }, orders: [] }));
   }
 }
 
 function writeData(data) {
   const cleaned = {
     ...data,
+    orders: normalizeStoredOrders(data?.orders),
     settings: {
       ...(data?.settings || {}),
       wifiRestrictionEnabled: false,

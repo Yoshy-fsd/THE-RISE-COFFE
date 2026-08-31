@@ -124,8 +124,8 @@ function getTableFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const table = params.get('table');
   if (!table) return null;
-  const cleaned = String(table).replace(/[^0-9]/g, '').slice(0, 2);
-  return cleaned ? Number(cleaned) : null;
+  const cleaned = String(table).trim().replace(/[^0-9]/g, '').slice(0, 2);
+  return cleaned ? cleaned : null;
 }
 
 function makeId(prefix = 'id') {
@@ -144,7 +144,8 @@ function normalizeOrderStatus(status) {
 }
 
 function normalizeOrder(order) {
-  return { ...order, status: normalizeOrderStatus(order?.status) };
+  const table = order?.table === 'Walk-in' || order?.table == null ? order?.table : String(order?.table);
+  return { ...order, table, status: normalizeOrderStatus(order?.status) };
 }
 
 function getLocalDateInputValue(date = new Date()) {
@@ -291,7 +292,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
     }
     const order = {
       id: makeId('order'),
-      table: table || 'Walk-in',
+      table: table ? String(table) : 'Walk-in',
       items: cart.map((item) => ({ id: item.id, name: item.name, qty: item.qty, price: Number(item.price), prepTime: Number(item.prepTime || 5) })),
       total,
       prepMinutes: totalPrep,
@@ -1408,12 +1409,6 @@ export default function App() {
       const hash = window.location.hash.replace('#', '').toLowerCase();
       const nextView = hash === 'admin' || hash === 'waiter' ? hash : 'customer';
       setCurrentView(nextView);
-
-      if (nextView === 'customer') {
-        setIsAdmin(false);
-        setIsWaiter(false);
-        setActiveWaiter(null);
-      }
       setAuthError('');
     };
 

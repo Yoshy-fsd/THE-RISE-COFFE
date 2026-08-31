@@ -596,7 +596,7 @@
   "orders": [
     {
       "id": "order-weprroeg-mthcflru",
-      "table": 1,
+      "table": "1",
       "items": [
         {
           "id": "p-1",
@@ -613,7 +613,7 @@
     },
     {
       "id": "order-joemojfb-mtheinlx",
-      "table": 7,
+      "table": "7",
       "items": [
         {
           "id": "p-1",
@@ -630,7 +630,7 @@
     },
     {
       "id": "order-tupgk926-mtheo2q0",
-      "table": 7,
+      "table": "7",
       "items": [
         {
           "id": "p-1",
@@ -643,6 +643,533 @@
       "total": 14,
       "prepMinutes": 3,
       "createdAt": "2026-08-31T15:41:00.744Z",
+      "status": "New"
+    },
+    {
+      "id": "order-4nb0bqyf-mthfiftg",
+      "table": "1",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:37.396Z",
+      "status": "New"
+    },
+    {
+      "id": "order-wmkjbysk-mthfiho6",
+      "table": "2",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:39.798Z",
+      "status": "New"
+    },
+    {
+      "id": "order-ulq572ct-mthfijh3",
+      "table": "3",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:42.135Z",
+      "status": "New"
+    },
+    {
+      "id": "order-gtz6caea-mthfila2",
+      "table": "4",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:44.474Z",
+      "status": "New"
+    },
+    {
+      "id": "order-qzwygb1b-mthfin18",
+      "table": "5",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:46.748Z",
+      "status": "New"
+    },
+    {
+      "id": "order-npi55e2i-mthfioxt",
+      "table": "6",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:49.217Z",
+      "status": "New"
+    },
+    {
+      "id": "order-z95i30qo-mthfiqso",
+      "table": "7",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:51.624Z",
+      "status": "New"
+    },
+    {
+      "id": "order-9dgjx4g4-mthfiunu",
+      "table": "9",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:56.634Z",
+      "status": "New"
+    },
+    {
+      "id": "order-azd931rg-mthfiwlt",
+      "table": "10",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:04:59.153Z",
+      "status": "New"
+    },
+    {
+      "id": "order-2by0z8ug-mthfiylz",
+      "table": "11",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:01.751Z",
+      "status": "New"
+    },
+    {
+      "id": "order-kh99go0r-mthfj0gd",
+      "table": "12",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:04.141Z",
+      "status": "New"
+    },
+    {
+      "id": "order-51cpwa8y-mthfj29o",
+      "table": "13",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:06.492Z",
+      "status": "New"
+    },
+    {
+      "id": "order-9mnj8aqd-mthfj3zn",
+      "table": "14",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:08.723Z",
+      "status": "New"
+    },
+    {
+      "id": "order-fdjueuvr-mthfj5rl",
+      "table": "15",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:11.025Z",
+      "status": "New"
+    },
+    {
+      "id": "order-t9ghwy2e-mthfj7n6",
+      "table": "16",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:13.458Z",
+      "status": "New"
+    },
+    {
+      "id": "order-2j2pfb14-mthfj9fc",
+      "table": "17",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:15.768Z",
+      "status": "New"
+    },
+    {
+      "id": "order-dsglqmfw-mthfjb6t",
+      "table": "18",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:18.053Z",
+      "status": "New"
+    },
+    {
+      "id": "order-u7bvmbxb-mthfjcz0",
+      "table": "19",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:20.364Z",
+      "status": "New"
+    },
+    {
+      "id": "order-d85qq4bz-mthfjeqw",
+      "table": "20",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:05:22.664Z",
+      "status": "New"
+    },
+    {
+      "id": "order-d58k1jrt-mthfl9tl",
+      "table": "1",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:06:49.593Z",
+      "status": "New"
+    },
+    {
+      "id": "order-0hbshx62-mthflbel",
+      "table": "2",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:06:51.645Z",
+      "status": "New"
+    },
+    {
+      "id": "order-6win4b15-mthfnq7i",
+      "table": "1",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:44.142Z",
+      "status": "New"
+    },
+    {
+      "id": "order-jec1qxqo-mthfnrv2",
+      "table": "2",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:46.286Z",
+      "status": "New"
+    },
+    {
+      "id": "order-b2tvdb0z-mthfnti2",
+      "table": "3",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:48.410Z",
+      "status": "New"
+    },
+    {
+      "id": "order-d2qcec3a-mthfnvb2",
+      "table": "4",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:50.750Z",
+      "status": "New"
+    },
+    {
+      "id": "order-k1eax4dx-mthfnwzq",
+      "table": "5",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:52.934Z",
+      "status": "New"
+    },
+    {
+      "id": "order-61cossl9-mthfnykr",
+      "table": "6",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:54.987Z",
+      "status": "New"
+    },
+    {
+      "id": "order-yhjl110a-mthfo05v",
+      "table": "7",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:57.043Z",
+      "status": "New"
+    },
+    {
+      "id": "order-3p7e298s-mthfo1pv",
+      "table": "8",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:08:59.059Z",
+      "status": "New"
+    },
+    {
+      "id": "order-rog71f9e-mthfo3b6",
+      "table": "9",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:09:01.122Z",
+      "status": "New"
+    },
+    {
+      "id": "order-x7exarpy-mthfo4vk",
+      "table": "10",
+      "items": [
+        {
+          "id": "p-1",
+          "name": "Espresso",
+          "qty": 1,
+          "price": 14,
+          "prepTime": 3
+        }
+      ],
+      "total": 14,
+      "prepMinutes": 3,
+      "createdAt": "2026-08-31T16:09:03.152Z",
       "status": "New"
     }
   ],
