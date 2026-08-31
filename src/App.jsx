@@ -707,6 +707,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const [newQrName, setNewQrName] = useState('');
   const [newQrLink, setNewQrLink] = useState('');
   const [productDrafts, setProductDrafts] = useState({});
+  const [selectedOrderDetailId, setSelectedOrderDetailId] = useState(null);
   const [groupStyleDraft, setGroupStyleDraft] = useState({
     backgroundColor: groups[0]?.backgroundColor || '#f4efe8',
     backgroundImage: groups[0]?.backgroundImage || '',
@@ -742,6 +743,19 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   }, [groups, selectedGroupId]);
 
   const totalOrders = orders.length;
+  const activeQueueOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => !['Served', 'Cancelled'].includes(order.status))
+    .slice()
+    .reverse();
+  const servedOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => order.status === 'Served')
+    .slice()
+    .reverse();
+  const selectedOrderDetail = orders
+    .map(normalizeOrder)
+    .find((order) => order.id === selectedOrderDetailId) || null;
   const salesStats = getSalesStats(orders, statsPeriod, statsDate, settings.statsDayStartedAt);
   const avgRating = feedback.length
     ? (feedback.reduce((sum, item) => sum + Number(item.rating || 0), 0) / feedback.length).toFixed(1)
@@ -771,6 +785,17 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const deleteOrder = (orderId) => {
     if (window.confirm('Delete this order permanently? It will also be removed from sales statistics.')) {
       onOrdersChange(orders.filter((order) => order.id !== orderId));
+      if (selectedOrderDetailId === orderId) setSelectedOrderDetailId(null);
+    }
+  };
+
+  const handleOrderAction = (orderId, action) => {
+    if (action === 'details') {
+      setSelectedOrderDetailId(orderId);
+      return;
+    }
+    if (action === 'delete') {
+      deleteOrder(orderId);
     }
   };
 
@@ -1152,42 +1177,104 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           </div>
         </section>
 
+        {selectedOrderDetail && (
+          <section className="admin-card wide-card">
+            <div className="section-title-row">
+              <h3>Order details</h3>
+              <button className="ghost-btn" onClick={() => setSelectedOrderDetailId(null)}>Close</button>
+            </div>
+            <div className="order-actions" style={{ justifyContent: 'flex-start', gap: '18px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <span><strong>Table:</strong> {selectedOrderDetail.table === 'Walk-in' ? 'Walk-in' : `Table ${selectedOrderDetail.table}`}</span>
+              <span><strong>Status:</strong> {selectedOrderDetail.status}</span>
+              <span><strong>Total:</strong> {settings.currency}{Number(selectedOrderDetail.total).toFixed(2)}</span>
+            </div>
+            <ul style={{ marginTop: '16px' }}>
+              {selectedOrderDetail.items.map((item) => (
+                <li key={`${selectedOrderDetail.id}-${item.id}`}>
+                  {item.qty} × {item.name} · {settings.currency}{Number(item.price).toFixed(2)} each
+                </li>
+              ))}
+            </ul>
+            <small>Created: {new Date(selectedOrderDetail.createdAt).toLocaleString()}</small>
+          </section>
+        )}
+
         <section className="admin-card wide-card">
-          <h3>Orders queue</h3>
-          {orders.length === 0 ? (
-            <div className="empty-state">No orders yet.</div>
+          <h3>Served orders dashboard</h3>
+          {servedOrders.length === 0 ? (
+            <div className="empty-state">No served orders yet.</div>
           ) : (
             <div className="orders-list">
-              {orders
-                .map(normalizeOrder)
-                .filter((order) => order.status !== 'Cancelled')
-                .slice()
-                .reverse()
-                .map((order) => (
-                  <div key={order.id} className="order-item">
-                    <div className="order-item-head">
-                      <strong>{order.table === 'Walk-in' ? 'Walk-in' : `Table ${order.table}`}</strong>
-                      <span>{formatTimeAgo(order.createdAt)}</span>
-                    </div>
-                    <ul>
-                      {order.items.map((item) => (
-                        <li key={`${order.id}-${item.id}`}>{item.qty} × {item.name}</li>
-                      ))}
-                    </ul>
-                    <div className="order-actions">
-                      <span>{settings.currency}{Number(order.total).toFixed(2)}</span>
-                      <select value={order.status} onChange={(e) => onOrderStatusChange(order.id, e.target.value)}>
-                        <option value="New">New</option>
-                        <option value="Received">Received</option>
-                        <option value="Preparing">Preparing</option>
-                        <option value="Ready">Ready</option>
-                        <option value="Served">Served</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                      <button className="danger-btn" onClick={() => deleteOrder(order.id)}>Delete</button>
-                    </div>
+              {servedOrders.map((order) => (
+                <div key={order.id} className="order-item">
+                  <div className="order-item-head">
+                    <strong>{order.table === 'Walk-in' ? 'Walk-in' : `Table ${order.table}`}</strong>
+                    <span>{formatTimeAgo(order.createdAt)}</span>
                   </div>
-                ))}
+                  <ul>
+                    {order.items.map((item) => (
+                      <li key={`${order.id}-${item.id}`}>{item.qty} × {item.name}</li>
+                    ))}
+                  </ul>
+                  <div className="order-actions">
+                    <span>{settings.currency}{Number(order.total).toFixed(2)}</span>
+                    <select defaultValue="" onChange={(event) => {
+                      const action = event.target.value;
+                      if (!action) return;
+                      handleOrderAction(order.id, action);
+                      event.target.value = '';
+                    }}>
+                      <option value="">Actions</option>
+                      <option value="details">View details</option>
+                      <option value="delete">Delete</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="admin-card wide-card">
+          <h3>Orders queue</h3>
+          {activeQueueOrders.length === 0 ? (
+            <div className="empty-state">No active orders yet.</div>
+          ) : (
+            <div className="orders-list">
+              {activeQueueOrders.map((order) => (
+                <div key={order.id} className="order-item">
+                  <div className="order-item-head">
+                    <strong>{order.table === 'Walk-in' ? 'Walk-in' : `Table ${order.table}`}</strong>
+                    <span>{formatTimeAgo(order.createdAt)}</span>
+                  </div>
+                  <ul>
+                    {order.items.map((item) => (
+                      <li key={`${order.id}-${item.id}`}>{item.qty} × {item.name}</li>
+                    ))}
+                  </ul>
+                  <div className="order-actions">
+                    <span>{settings.currency}{Number(order.total).toFixed(2)}</span>
+                    <select value={order.status} onChange={(e) => onOrderStatusChange(order.id, e.target.value)}>
+                      <option value="New">New</option>
+                      <option value="Received">Received</option>
+                      <option value="Preparing">Preparing</option>
+                      <option value="Ready">Ready</option>
+                      <option value="Served">Served</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                    <select defaultValue="" onChange={(event) => {
+                      const action = event.target.value;
+                      if (!action) return;
+                      handleOrderAction(order.id, action);
+                      event.target.value = '';
+                    }}>
+                      <option value="">Actions</option>
+                      <option value="details">View details</option>
+                      <option value="delete">Delete</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>
