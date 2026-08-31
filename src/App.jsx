@@ -611,13 +611,21 @@ function WaiterAuth({ waiters, onUnlock, error }) {
   );
 }
 
-function WaiterView({ waiterName, settings, orders, onOrderStatusChange }) {
+function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warningMessage }) {
   const shiftStats = getWaiterShiftStats(orders);
   const activeOrders = orders.filter((order) => !['Served', 'Cancelled'].includes(order.status)).slice().reverse();
 
   return (
     <div className="admin-shell">
       <style>{styles}</style>
+      {warningMessage && (
+        <div className="auth-wrap" style={{ padding: '20px 0 0' }}>
+          <div className="auth-card network-blocked-card">
+            <h2>Welcome to {settings.name}</h2>
+            <p>{warningMessage}</p>
+          </div>
+        </div>
+      )}
       <header className="admin-topbar">
         <div>
           <h2>{waiterName} section</h2>
@@ -666,7 +674,7 @@ function WaiterView({ waiterName, settings, orders, onOrderStatusChange }) {
   );
 }
 
-function AdminView({ settings, groups, products, orders, feedback, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onOrdersChange, onSubmitFeedback }) {
+function AdminView({ settings, groups, products, orders, feedback, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onOrdersChange, onSubmitFeedback, warningMessage }) {
   const [draftSettings, setDraftSettings] = useState(settings);
   const [draftGroupName, setDraftGroupName] = useState('');
   const [draftProduct, setDraftProduct] = useState({ name: '', groupId: groups[0]?.id || '', price: 0, emoji: '☕', image: '', details: '', prepTime: 5, available: true });
@@ -928,6 +936,14 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   return (
     <div className="admin-shell">
       <style>{styles}</style>
+      {warningMessage && (
+        <div className="auth-wrap" style={{ padding: '20px 0 0' }}>
+          <div className="auth-card network-blocked-card">
+            <h2>Welcome to {settings.name}</h2>
+            <p>{warningMessage}</p>
+          </div>
+        </div>
+      )}
       <header className="admin-topbar">
         <div>
           <h2>Admin dashboard</h2>
@@ -1329,12 +1345,15 @@ export default function App() {
     setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, status } : order)));
   };
 
-  if (networkAllowed === false) {
+  const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';
+  const isStaffView = currentView === 'admin' || currentView === 'waiter';
+
+  if (networkAllowed === false && !isStaffView) {
     return (
       <div className="auth-wrap">
         <div className="auth-card network-blocked-card">
           <h2>Welcome to {settings.name}</h2>
-          <p>This ordering page works only while connected to the coffee shop Wi-Fi.</p>
+          <p>{wifiWarningMessage}</p>
           <button onClick={() => window.location.reload()}>Check connection again</button>
         </div>
       </div>
@@ -1358,9 +1377,10 @@ export default function App() {
       onOrderStatusChange={changeOrderStatus}
       onOrdersChange={setOrders}
       onSubmitFeedback={submitFeedback}
+      warningMessage={networkAllowed === false ? wifiWarningMessage : ''}
     />
   ) : currentView === 'waiter' ? (
-    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} />
+    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} warningMessage={networkAllowed === false ? wifiWarningMessage : ''} />
   ) : (
     <CustomerView
       settings={settings}
