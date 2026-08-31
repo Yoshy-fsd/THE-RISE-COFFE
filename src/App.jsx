@@ -682,6 +682,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const [networkInfo, setNetworkInfo] = useState({ detectedNetworks: [] });
   const [newQrName, setNewQrName] = useState('');
   const [newQrLink, setNewQrLink] = useState('');
+  const [productDrafts, setProductDrafts] = useState({});
   const [groupStyleDraft, setGroupStyleDraft] = useState({
     backgroundColor: groups[0]?.backgroundColor || '#f4efe8',
     backgroundImage: groups[0]?.backgroundImage || '',
@@ -691,6 +692,16 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   useEffect(() => {
     setDraftSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    setProductDrafts((current) => {
+      const next = {};
+      products.forEach((product) => {
+        next[product.id] = { ...(current[product.id] || product), ...product };
+      });
+      return next;
+    });
+  }, [products]);
 
   useEffect(() => {
     fetchNetworkInfo().then(setNetworkInfo).catch(() => {});
@@ -874,7 +885,16 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   };
 
   const updateProduct = (productId, patch) => {
-    onProductsChange(products.map((product) => (product.id === productId ? { ...product, ...patch } : product)));
+    setProductDrafts((current) => ({
+      ...current,
+      [productId]: { ...(current[productId] || products.find((product) => product.id === productId) || {}), ...patch },
+    }));
+  };
+
+  const saveProductEdits = (productId) => {
+    const draft = productDrafts[productId];
+    if (!draft) return;
+    onProductsChange(products.map((product) => (product.id === productId ? { ...product, ...draft } : product)));
   };
 
   const removeProduct = (productId) => {
@@ -1077,20 +1097,26 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           <button className="primary-btn" onClick={saveProduct}>Add product</button>
 
           <div className="product-editor-list">
-            {products.map((product) => (
-              <div key={product.id} className="product-editor-item">
-                <div className="product-mini-art">{product.image ? <img src={product.image} alt={product.name} /> : <span>{product.emoji || '☕'}</span>}</div>
-                <div className="product-edit-fields">
-                  <input value={product.name} onChange={(e) => updateProduct(product.id, { name: e.target.value })} />
-                  <input type="number" value={product.price} onChange={(e) => updateProduct(product.id, { price: Number(e.target.value) })} />
-                  <input type="number" value={product.prepTime || 5} onChange={(e) => updateProduct(product.id, { prepTime: Number(e.target.value) })} />
-                  <input value={product.image || ''} onChange={(e) => updateProduct(product.id, { image: e.target.value })} placeholder="Image URL" />
-                  <label>Upload photo<input type="file" accept="image/*" onChange={(event) => handleProductImageUpload(product.id, event)} /></label>
-                  <label className="availability-toggle"><input type="checkbox" checked={product.available !== false} onChange={(e) => updateProduct(product.id, { available: e.target.checked })} /> Available</label>
+            {products.map((product) => {
+              const draft = productDrafts[product.id] || product;
+              return (
+                <div key={product.id} className="product-editor-item">
+                  <div className="product-mini-art">{draft.image ? <img src={draft.image} alt={draft.name} /> : <span>{draft.emoji || '☕'}</span>}</div>
+                  <div className="product-edit-fields">
+                    <input value={draft.name} onChange={(e) => updateProduct(product.id, { name: e.target.value })} />
+                    <input type="number" value={draft.price} onChange={(e) => updateProduct(product.id, { price: Number(e.target.value) })} />
+                    <input type="number" value={draft.prepTime || 5} onChange={(e) => updateProduct(product.id, { prepTime: Number(e.target.value) })} />
+                    <input value={draft.image || ''} onChange={(e) => updateProduct(product.id, { image: e.target.value })} placeholder="Image URL" />
+                    <label>Upload photo<input type="file" accept="image/*" onChange={(event) => handleProductImageUpload(product.id, event)} /></label>
+                    <label className="availability-toggle"><input type="checkbox" checked={draft.available !== false} onChange={(e) => updateProduct(product.id, { available: e.target.checked })} /> Available</label>
+                  </div>
+                  <div className="product-edit-actions">
+                    <button className="primary-btn" onClick={() => saveProductEdits(product.id)}>Save</button>
+                    <button className="danger-btn" onClick={() => removeProduct(product.id)}>Delete</button>
+                  </div>
                 </div>
-                <button className="danger-btn" onClick={() => removeProduct(product.id)}>Delete</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
