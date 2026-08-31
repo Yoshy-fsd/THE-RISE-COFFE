@@ -1,7 +1,8 @@
 function getApiBase() {
   const hostname = window.location.hostname || 'localhost';
   const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-  return `${protocol}://${hostname}:3001/api`;
+  const localBackendPort = window.location.port === '5173' ? ':3001' : '';
+  return `${protocol}://${hostname}${localBackendPort}/api`;
 }
 
 export async function fetchSharedData() {

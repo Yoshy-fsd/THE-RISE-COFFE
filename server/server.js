@@ -112,7 +112,8 @@ function writeData(data) {
 }
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+const clientDist = path.join(__dirname, '..', 'dist');
 
 function getLocalIpv4Addresses() {
   return Object.values(os.networkInterfaces())
@@ -144,6 +145,7 @@ function requireCoffeeWifi(req, res, next) {
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use(express.static(clientDist));
 
 app.get('/api/access', (req, res) => {
   const addresses = getLocalIpv4Addresses();
@@ -166,6 +168,10 @@ app.post('/api/data', requireCoffeeWifi, (req, res) => {
   const next = { ...current, ...body };
   writeData(next);
   res.json(next);
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
