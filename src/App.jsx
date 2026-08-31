@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { checkNetworkAccess, fetchNetworkInfo, fetchSharedData, saveSharedData } from './api';
 
 const ADMIN_MASTER_CODE = '1920';
+const ADMIN_FULL_ACCESS_CODE = '2000';
 const DEFAULT_WAITER_PASSWORD = '667788';
 const OWNER_INSTAGRAM_CODE = '2005926';
 const DEFAULT_OWNER_INSTAGRAM = 'https://www.instagram.com/neder_shh/';
@@ -1148,7 +1149,7 @@ export default function App() {
   };
 
   const unlockAdmin = (code) => {
-    if (String(code) === String(settings.adminPassword || defaultSettings.adminPassword)) {
+    if (String(code) === ADMIN_FULL_ACCESS_CODE || String(code) === String(settings.adminPassword || defaultSettings.adminPassword)) {
       setIsAdmin(true);
       setCurrentView('admin');
       window.location.hash = '#admin';
