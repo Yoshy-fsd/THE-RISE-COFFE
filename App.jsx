@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { checkNetworkAccess, fetchNetworkInfo, fetchSharedData, saveSharedData } from './api';
 
 const ADMIN_MASTER_CODE = '1920';
@@ -124,8 +124,8 @@ function getTableFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const table = params.get('table');
   if (!table) return null;
-  const cleaned = String(table).replace(/[^0-9]/g, '').slice(0, 2);
-  return cleaned ? Number(cleaned) : null;
+  const cleaned = String(table).trim().replace(/[^0-9]/g, '').slice(0, 2);
+  return cleaned ? cleaned : null;
 }
 
 function makeId(prefix = 'id') {
@@ -135,6 +135,17 @@ function makeId(prefix = 'id') {
 function formatTimeAgo(dateString) {
   const diff = Math.max(1, Math.round((Date.now() - new Date(dateString).getTime()) / 60000));
   return `${diff} min ago`;
+}
+
+function normalizeOrderStatus(status) {
+  const allowed = new Set(['New', 'Received', 'Preparing', 'Ready', 'Served', 'Cancelled']);
+  const next = String(status || 'New');
+  return allowed.has(next) ? next : 'New';
+}
+
+function normalizeOrder(order) {
+  const table = order?.table === 'Walk-in' || order?.table == null ? order?.table : String(order?.table);
+  return { ...order, table, status: normalizeOrderStatus(order?.status) };
 }
 
 function getLocalDateInputValue(date = new Date()) {
@@ -202,10 +213,14 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [toast, setToast] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const orderSubmissionLock = useRef(false);
   const table = getTableFromUrl();
   const canOrder = Boolean(table);
   const customerOrderIds = readStorage('coffee-menu-customer-orders-v1', []);
   const customerOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => order.status !== 'Cancelled')
     .filter((order) => table
       ? String(order.table) === String(table)
       : customerOrderIds.includes(order.id))
@@ -273,13 +288,15 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const totalPrep = cart.reduce((sum, item) => sum + Number(item.prepTime || 5) * item.qty, 0);
 
   const handlePlaceOrder = () => {
-    if (!cart.length || !canOrder) {
+    if (!cart.length || !canOrder || orderSubmissionLock.current) {
       if (!canOrder) setToast('Scan your table QR code to order.');
       return;
     }
+    orderSubmissionLock.current = true;
+    setIsSubmitting(true);
     const order = {
       id: makeId('order'),
-      table: table || 'Walk-in',
+      table: table ? String(table) : 'Walk-in',
       items: cart.map((item) => ({ id: item.id, name: item.name, qty: item.qty, price: Number(item.price), prepTime: Number(item.prepTime || 5) })),
       total,
       prepMinutes: totalPrep,
@@ -290,6 +307,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
     writeStorage('coffee-menu-customer-orders-v1', [...customerOrderIds, order.id].slice(-5));
     setCart([]);
     setToast('Order sent to the admin.');
+    setIsSubmitting(false);
   };
 
   const averageRating = feedback.length
@@ -355,7 +373,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
             <span>Total</span>
             <strong>{settings.currency}{total.toFixed(2)}</strong>
           </div>
-          <button className="place-order" onClick={handlePlaceOrder} disabled={!cart.length || !canOrder}>Send order</button>
+          <button className="place-order" onClick={handlePlaceOrder} disabled={!cart.length || !canOrder || isSubmitting}>Send order</button>
 
           <div className="order-status-panel">
               <div className="panel-head">
@@ -613,7 +631,11 @@ function WaiterAuth({ waiters, onUnlock, error }) {
 
 function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warningMessage }) {
   const shiftStats = getWaiterShiftStats(orders);
-  const activeOrders = orders.filter((order) => !['Served', 'Cancelled'].includes(order.status)).slice().reverse();
+  const activeOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => !['Served', 'Cancelled'].includes(order.status))
+    .slice()
+    .reverse();
 
   return (
     <div className="admin-shell">
@@ -691,6 +713,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const [newQrName, setNewQrName] = useState('');
   const [newQrLink, setNewQrLink] = useState('');
   const [productDrafts, setProductDrafts] = useState({});
+  const [selectedOrderDetailId, setSelectedOrderDetailId] = useState(null);
   const [groupStyleDraft, setGroupStyleDraft] = useState({
     backgroundColor: groups[0]?.backgroundColor || '#f4efe8',
     backgroundImage: groups[0]?.backgroundImage || '',
@@ -726,6 +749,19 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   }, [groups, selectedGroupId]);
 
   const totalOrders = orders.length;
+  const activeQueueOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => !['Served', 'Cancelled'].includes(order.status))
+    .slice()
+    .reverse();
+  const servedOrders = orders
+    .map(normalizeOrder)
+    .filter((order) => order.status === 'Served')
+    .slice()
+    .reverse();
+  const selectedOrderDetail = orders
+    .map(normalizeOrder)
+    .find((order) => order.id === selectedOrderDetailId) || null;
   const salesStats = getSalesStats(orders, statsPeriod, statsDate, settings.statsDayStartedAt);
   const avgRating = feedback.length
     ? (feedback.reduce((sum, item) => sum + Number(item.rating || 0), 0) / feedback.length).toFixed(1)
@@ -755,6 +791,17 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const deleteOrder = (orderId) => {
     if (window.confirm('Delete this order permanently? It will also be removed from sales statistics.')) {
       onOrdersChange(orders.filter((order) => order.id !== orderId));
+      if (selectedOrderDetailId === orderId) setSelectedOrderDetailId(null);
+    }
+  };
+
+  const handleOrderAction = (orderId, action) => {
+    if (action === 'details') {
+      setSelectedOrderDetailId(orderId);
+      return;
+    }
+    if (action === 'delete') {
+      deleteOrder(orderId);
     }
   };
 
@@ -1136,13 +1183,71 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           </div>
         </section>
 
+        {selectedOrderDetail && (
+          <section className="admin-card wide-card">
+            <div className="section-title-row">
+              <h3>Order details</h3>
+              <button className="ghost-btn" onClick={() => setSelectedOrderDetailId(null)}>Close</button>
+            </div>
+            <div className="order-actions" style={{ justifyContent: 'flex-start', gap: '18px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <span><strong>Table:</strong> {selectedOrderDetail.table === 'Walk-in' ? 'Walk-in' : `Table ${selectedOrderDetail.table}`}</span>
+              <span><strong>Status:</strong> {selectedOrderDetail.status}</span>
+              <span><strong>Total:</strong> {settings.currency}{Number(selectedOrderDetail.total).toFixed(2)}</span>
+            </div>
+            <ul style={{ marginTop: '16px' }}>
+              {selectedOrderDetail.items.map((item) => (
+                <li key={`${selectedOrderDetail.id}-${item.id}`}>
+                  {item.qty} × {item.name} · {settings.currency}{Number(item.price).toFixed(2)} each
+                </li>
+              ))}
+            </ul>
+            <small>Created: {new Date(selectedOrderDetail.createdAt).toLocaleString()}</small>
+          </section>
+        )}
+
         <section className="admin-card wide-card">
-          <h3>Orders queue</h3>
-          {orders.length === 0 ? (
-            <div className="empty-state">No orders yet.</div>
+          <h3>Served orders dashboard</h3>
+          {servedOrders.length === 0 ? (
+            <div className="empty-state">No served orders yet.</div>
           ) : (
             <div className="orders-list">
-              {orders.slice().reverse().map((order) => (
+              {servedOrders.map((order) => (
+                <div key={order.id} className="order-item">
+                  <div className="order-item-head">
+                    <strong>{order.table === 'Walk-in' ? 'Walk-in' : `Table ${order.table}`}</strong>
+                    <span>{formatTimeAgo(order.createdAt)}</span>
+                  </div>
+                  <ul>
+                    {order.items.map((item) => (
+                      <li key={`${order.id}-${item.id}`}>{item.qty} × {item.name}</li>
+                    ))}
+                  </ul>
+                  <div className="order-actions">
+                    <span>{settings.currency}{Number(order.total).toFixed(2)}</span>
+                    <select defaultValue="" onChange={(event) => {
+                      const action = event.target.value;
+                      if (!action) return;
+                      handleOrderAction(order.id, action);
+                      event.target.value = '';
+                    }}>
+                      <option value="">Actions</option>
+                      <option value="details">View details</option>
+                      <option value="delete">Delete</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="admin-card wide-card">
+          <h3>Orders queue</h3>
+          {activeQueueOrders.length === 0 ? (
+            <div className="empty-state">No active orders yet.</div>
+          ) : (
+            <div className="orders-list">
+              {activeQueueOrders.map((order) => (
                 <div key={order.id} className="order-item">
                   <div className="order-item-head">
                     <strong>{order.table === 'Walk-in' ? 'Walk-in' : `Table ${order.table}`}</strong>
@@ -1163,7 +1268,16 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
                       <option value="Served">Served</option>
                       <option value="Cancelled">Cancelled</option>
                     </select>
-                    <button className="danger-btn" onClick={() => deleteOrder(order.id)}>Delete</button>
+                    <select defaultValue="" onChange={(event) => {
+                      const action = event.target.value;
+                      if (!action) return;
+                      handleOrderAction(order.id, action);
+                      event.target.value = '';
+                    }}>
+                      <option value="">Actions</option>
+                      <option value="details">View details</option>
+                      <option value="delete">Delete</option>
+                    </select>
                   </div>
                 </div>
               ))}
@@ -1195,7 +1309,10 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
 }
 
 export default function App() {
-  const [settings, setSettings] = useState(() => readStorage(STORAGE_KEYS.settings, defaultSettings));
+  const [settings, setSettings] = useState(() => {
+    const saved = readStorage(STORAGE_KEYS.settings, defaultSettings);
+    return { ...defaultSettings, ...saved, wifiRestrictionEnabled: false };
+  });
   const [groups, setGroups] = useState(() => readStorage(STORAGE_KEYS.groups, baseGroups));
   const [products, setProducts] = useState(() => readStorage(STORAGE_KEYS.products, baseProducts.map(([name, groupId, price, emoji, prepTime, details], index) => ({
     id: `p-${index + 1}`,
@@ -1232,10 +1349,10 @@ export default function App() {
       .then((data) => {
         if (!mounted) return;
 
-        if (data?.settings) setSettings({ ...defaultSettings, ...data.settings });
+        if (data?.settings) setSettings({ ...defaultSettings, ...data.settings, wifiRestrictionEnabled: false });
         if (data?.groups) setGroups(data.groups);
         if (data?.products) setProducts(data.products);
-        if (data?.orders) setOrders(data.orders);
+        if (data?.orders) setOrders(data.orders.map(normalizeOrder));
         if (data?.feedback) setFeedback(data.feedback);
         setBackendReady(true);
       })
@@ -1255,7 +1372,7 @@ export default function App() {
     const refreshOrders = () => {
       fetchSharedData()
         .then((data) => {
-          if (data?.orders) setOrders(data.orders);
+          if (data?.orders) setOrders(data.orders.map(normalizeOrder));
         })
         .catch(() => {});
     };
@@ -1295,9 +1412,8 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      setCurrentView(hash === 'admin' || hash === 'waiter' ? hash : 'customer');
-      setIsAdmin(false);
-      setIsWaiter(false);
+      const nextView = hash === 'admin' || hash === 'waiter' ? hash : 'customer';
+      setCurrentView(nextView);
       setAuthError('');
     };
 
@@ -1307,7 +1423,7 @@ export default function App() {
   }, []);
 
   const placeOrder = (order) => {
-    setOrders((current) => [...current, order]);
+    setOrders((current) => [...current, normalizeOrder(order)]);
   };
 
   const submitFeedback = (entry) => {
@@ -1342,7 +1458,7 @@ export default function App() {
   };
 
   const changeOrderStatus = (orderId, status) => {
-    setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, status } : order)));
+    setOrders((current) => current.map((order) => (order.id === orderId ? normalizeOrder({ ...order, status }) : normalizeOrder(order))));
   };
 
   const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';
@@ -1378,10 +1494,10 @@ export default function App() {
       onOrderStatusChange={changeOrderStatus}
       onOrdersChange={setOrders}
       onSubmitFeedback={submitFeedback}
-      warningMessage={networkAllowed === false ? wifiWarningMessage : ''}
+      warningMessage={wifiRestricted && networkAllowed === false ? wifiWarningMessage : ''}
     />
   ) : currentView === 'waiter' ? (
-    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} warningMessage={networkAllowed === false ? wifiWarningMessage : ''} />
+    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} warningMessage={wifiRestricted && networkAllowed === false ? wifiWarningMessage : ''} />
   ) : (
     <CustomerView
       settings={settings}
