@@ -192,6 +192,39 @@ app.get('/api/data', requireCoffeeWifi, (req, res) => {
   res.json(readData());
 });
 
+app.post('/api/orders', requireCoffeeWifi, (req, res) => {
+  const order = req.body || {};
+  if (!order.id || !Array.isArray(order.items) || order.items.length === 0) {
+    return res.status(400).json({ error: 'A valid order is required.' });
+  }
+
+  const current = readData();
+  const existing = current.orders.find((entry) => entry.id === order.id);
+  if (existing) return res.json(existing);
+
+  const nextOrder = {
+    ...order,
+    status: 'New',
+    createdAt: order.createdAt || new Date().toISOString(),
+  };
+  current.orders.push(nextOrder);
+  writeData(current);
+  return res.status(201).json(nextOrder);
+});
+
+app.patch('/api/orders/:id', requireCoffeeWifi, (req, res) => {
+  const allowedStatuses = ['New', 'Received', 'Preparing', 'Ready', 'Served', 'Cancelled'];
+  const status = String(req.body?.status || '');
+  if (!allowedStatuses.includes(status)) return res.status(400).json({ error: 'Invalid order status.' });
+
+  const current = readData();
+  const index = current.orders.findIndex((order) => order.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Order not found.' });
+  current.orders[index] = { ...current.orders[index], status };
+  writeData(current);
+  return res.json(current.orders[index]);
+});
+
 app.post('/api/data', requireCoffeeWifi, (req, res) => {
   const body = req.body || {};
   const current = readData();

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { checkNetworkAccess, fetchNetworkInfo, fetchSharedData, saveSharedData } from './api';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { checkNetworkAccess, createOrder, fetchNetworkInfo, fetchSharedData, saveSharedData, updateOrderStatus } from './api';
 
 const ADMIN_MASTER_CODE = '1920';
 const ADMIN_FULL_ACCESS_CODE = '2000';
@@ -213,6 +213,8 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [toast, setToast] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const orderSubmissionLock = useRef(false);
   const table = getTableFromUrl();
   const canOrder = Boolean(table);
   const customerOrderIds = readStorage('coffee-menu-customer-orders-v1', []);
@@ -285,11 +287,13 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const total = cart.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
   const totalPrep = cart.reduce((sum, item) => sum + Number(item.prepTime || 5) * item.qty, 0);
 
-  const handlePlaceOrder = () => {
-    if (!cart.length || !canOrder) {
+  const handlePlaceOrder = async () => {
+    if (!cart.length || !canOrder || orderSubmissionLock.current) {
       if (!canOrder) setToast('Scan your table QR code to order.');
       return;
     }
+    orderSubmissionLock.current = true;
+    setIsSubmitting(true);
     const order = {
       id: makeId('order'),
       table: table ? String(table) : 'Walk-in',
@@ -299,10 +303,17 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
       createdAt: new Date().toISOString(),
       status: 'New',
     };
-    onPlaceOrder(order);
-    writeStorage('coffee-menu-customer-orders-v1', [...customerOrderIds, order.id].slice(-5));
-    setCart([]);
-    setToast('Order sent to the admin.');
+    try {
+      const savedOrder = await onPlaceOrder(order);
+      writeStorage('coffee-menu-customer-orders-v1', [...customerOrderIds, savedOrder.id].slice(-5));
+      setCart([]);
+      setToast('Order sent to the admin.');
+    } catch {
+      setToast('Could not send the order. Please try again.');
+    } finally {
+      orderSubmissionLock.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const averageRating = feedback.length
@@ -368,7 +379,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
             <span>Total</span>
             <strong>{settings.currency}{total.toFixed(2)}</strong>
           </div>
-          <button className="place-order" onClick={handlePlaceOrder} disabled={!cart.length || !canOrder}>Send order</button>
+          <button className="place-order" onClick={handlePlaceOrder} disabled={!cart.length || !canOrder || isSubmitting}>Send order</button>
 
           <div className="order-status-panel">
               <div className="panel-head">
@@ -1399,10 +1410,10 @@ export default function App() {
   useEffect(() => {
     if (!backendReady) return;
 
-    saveSharedData({ settings, groups, products, orders, feedback }).catch(() => {
+    saveSharedData({ settings, groups, products, feedback }).catch(() => {
       // fallback silently if backend is unavailable
     });
-  }, [settings, groups, products, orders, feedback, backendReady]);
+  }, [settings, groups, products, feedback, backendReady]);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -1417,8 +1428,12 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const placeOrder = (order) => {
-    setOrders((current) => [...current, normalizeOrder(order)]);
+  const placeOrder = async (order) => {
+    const savedOrder = await createOrder(order);
+    setOrders((current) => current.some((entry) => entry.id === savedOrder.id)
+      ? current
+      : [...current, normalizeOrder(savedOrder)]);
+    return savedOrder;
   };
 
   const submitFeedback = (entry) => {
@@ -1452,8 +1467,15 @@ export default function App() {
     setAuthError('');
   };
 
-  const changeOrderStatus = (orderId, status) => {
+  const changeOrderStatus = async (orderId, status) => {
     setOrders((current) => current.map((order) => (order.id === orderId ? normalizeOrder({ ...order, status }) : normalizeOrder(order))));
+    try {
+      await updateOrderStatus(orderId, status);
+    } catch {
+      fetchSharedData().then((data) => {
+        if (data?.orders) setOrders(data.orders.map(normalizeOrder));
+      }).catch(() => {});
+    }
   };
 
   const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';

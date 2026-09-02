@@ -52,3 +52,19 @@ export async function saveSharedData(data) {
     body: JSON.stringify(data),
   });
 }
+
+export async function createOrder(order) {
+  return fetchJsonWithFallback('/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order),
+  });
+}
+
+export async function updateOrderStatus(orderId, status) {
+  return fetchJsonWithFallback(`/orders/${encodeURIComponent(orderId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+}
