@@ -225,7 +225,7 @@ app.post('/api/orders', requireCoffeeWifi, (req, res) => {
 
   const nextOrder = {
     ...order,
-    status: 'New',
+    status: ['New', 'Received', 'Preparing', 'Ready', 'Served', 'Cancelled'].includes(String(order.status)) ? String(order.status) : 'New',
     createdAt: order.createdAt || new Date().toISOString(),
   };
   current.orders.push(nextOrder);
@@ -241,7 +241,11 @@ app.patch('/api/orders/:id', requireCoffeeWifi, (req, res) => {
   const current = readData();
   const index = current.orders.findIndex((order) => order.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: 'Order not found.' });
-  current.orders[index] = { ...current.orders[index], status };
+  current.orders[index] = {
+    ...current.orders[index],
+    status,
+    ...(typeof req.body?.customerCleared === 'boolean' ? { customerCleared: req.body.customerCleared } : {}),
+  };
   writeData(current);
   return res.json(current.orders[index]);
 });

@@ -61,10 +61,10 @@ export async function createOrder(order) {
   });
 }
 
-export async function updateOrderStatus(orderId, status) {
+export async function updateOrderStatus(orderId, status, patch = {}) {
   return fetchJsonWithFallback(`/orders/${encodeURIComponent(orderId)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...patch }),
   });
 }

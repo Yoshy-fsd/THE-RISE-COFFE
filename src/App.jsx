@@ -736,6 +736,7 @@ function WaiterView({ waiterName, settings, groups, products, orders, onPlaceOrd
   const activeOrders = orders
     .map(normalizeOrder)
     .filter((order) => !['Served', 'Cancelled'].includes(order.status))
+    .filter((order) => order.customerCleared !== true)
     .slice()
     .reverse();
   const manualProducts = products.filter((product) => product.groupId === manualGroupId && product.available !== false);
@@ -1672,7 +1673,8 @@ export default function App() {
         .catch(() => {});
     };
 
-    const intervalId = window.setInterval(refreshOrders, 5000);
+    refreshOrders();
+    const intervalId = window.setInterval(refreshOrders, 1000);
     return () => window.clearInterval(intervalId);
   }, [backendReady]);
 
@@ -1767,7 +1769,7 @@ export default function App() {
       ? normalizeOrder({ ...order, status, customerCleared: status === 'Served' ? true : order.customerCleared })
       : normalizeOrder(order))));
     try {
-      await updateOrderStatus(orderId, status);
+      await updateOrderStatus(orderId, status, { customerCleared: status === 'Served' ? true : false });
     } catch {
       fetchSharedData().then((data) => {
         if (data?.orders) setOrders(normalizeOrders(data.orders));
@@ -1775,10 +1777,12 @@ export default function App() {
     }
   };
 
-  const clearTableForCustomer = (table) => {
+  const clearTableForCustomer = async (table) => {
+    const tableOrders = orders.filter((order) => String(order.table) === String(table) && order.customerCleared !== true);
     setOrders((current) => current.map((order) => String(order.table) === String(table)
       ? { ...order, customerCleared: true }
       : order));
+    await Promise.all(tableOrders.map((order) => updateOrderStatus(order.id, order.status, { customerCleared: true })));
   };
 
   const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';
