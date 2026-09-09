@@ -1633,7 +1633,7 @@ export default function App() {
         if (data?.feedback) setFeedback(data.feedback);
         if (data?.events) setEvents(data.events.map(normalizeEvent));
 
-        if (!readStorage(STORAGE_KEYS.menuImport, false)) {
+        if (!readStorage(STORAGE_KEYS.menuImport, false) && (!Array.isArray(data?.products) || data.products.length === 0)) {
           const sharedGroups = data?.groups || baseGroups;
           setGroups(sharedGroups.map((group) => importedGroupNames[group.id] ? { ...group, name: importedGroupNames[group.id] } : group));
           setProducts(importedProducts.map(([name, groupId, price], index) => ({
