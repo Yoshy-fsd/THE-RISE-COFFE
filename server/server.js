@@ -100,11 +100,24 @@ function ensureData() {
 
 function normalizeStoredOrders(orders) {
   if (!Array.isArray(orders)) return [];
+  const seen = new Set();
   return orders.map((order) => ({
     ...order,
     table: order?.table === 'Walk-in' || order?.table == null ? order?.table : String(order.table),
     status: ['New', 'Received', 'Preparing', 'Ready', 'Served', 'Cancelled'].includes(String(order?.status || 'New')) ? String(order.status) : 'New',
-  }));
+  })).filter((order) => {
+    if (!order.id || seen.has(order.id)) return false;
+    seen.add(order.id);
+    return Array.isArray(order.items) && order.items.length > 0;
+  });
+}
+
+function getOrderSignature(order) {
+  return JSON.stringify({
+    table: String(order.table || 'Walk-in'),
+    items: (order.items || []).map((item) => ({ id: item.id, qty: item.qty, price: item.price })),
+    total: Number(order.total || 0),
+  });
 }
 
 function readData() {
@@ -201,6 +214,14 @@ app.post('/api/orders', requireCoffeeWifi, (req, res) => {
   const current = readData();
   const existing = current.orders.find((entry) => entry.id === order.id);
   if (existing) return res.json(existing);
+
+  if (order.source === 'qr') {
+    const createdAt = new Date(order.createdAt || Date.now()).getTime();
+    const duplicate = current.orders.find((entry) => entry.source === 'qr'
+      && getOrderSignature(entry) === getOrderSignature(order)
+      && Math.abs(new Date(entry.createdAt).getTime() - createdAt) <= 15000);
+    if (duplicate) return res.json(duplicate);
+  }
 
   const nextOrder = {
     ...order,

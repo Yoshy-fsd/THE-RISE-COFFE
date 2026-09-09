@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { checkNetworkAccess, createOrder, fetchNetworkInfo, fetchSharedData, saveSharedData, updateOrderStatus } from './api';
+import { importedGroupNames, importedProducts } from './menuImport';
 
 const ADMIN_MASTER_CODE = '1920';
 const ADMIN_FULL_ACCESS_CODE = '2000';
@@ -14,6 +15,8 @@ const STORAGE_KEYS = {
   products: 'coffee-menu-products-v1',
   orders: 'coffee-menu-orders-v1',
   feedback: 'coffee-menu-feedback-v1',
+  menuImport: 'coffee-menu-import-v1',
+  events: 'coffee-menu-events-v1',
 };
 
 const baseGroups = [
@@ -84,16 +87,18 @@ const baseProducts = [
 ];
 
 const defaultSettings = {
-  name: 'Tabac & Bloom',
+  name: 'THE RISE',
   tagline: 'Coffee, brewed with intent.',
-  currency: '$',
+  currency: 'DT',
   accent: '#7ea86b',
   background: '#e9f0e1',
   textColor: '#1f2f20',
   instagram: '@tabacandbloom',
   facebookUrl: '',
-  logoText: 'T&B',
-  logoUrl: '',
+  logoText: 'THE RISE',
+  logoUrl: '/logo_the_rise_high_quality.jpg',
+  locationName: 'Find us at the coffee shop',
+  locationUrl: COFFEE_LOCATION_URL,
   allowedWifiNetwork: '',
   adminPassword: '93449919',
   waiterName: 'Waiter',
@@ -102,6 +107,17 @@ const defaultSettings = {
   ownerInstagramUrl: DEFAULT_OWNER_INSTAGRAM,
   wifiRestrictionEnabled: false,
 };
+
+function normalizeSettings(saved = {}) {
+  return {
+    ...defaultSettings,
+    ...saved,
+    ...(saved.name === 'Tabac & Bloom' ? { name: 'THE RISE', logoText: 'THE RISE' } : {}),
+    logoUrl: saved.logoUrl || defaultSettings.logoUrl,
+    currency: saved.currency === '$' || !saved.currency ? defaultSettings.currency : saved.currency,
+    wifiRestrictionEnabled: false,
+  };
+}
 
 function readStorage(key, fallback) {
   try {
@@ -132,6 +148,15 @@ function makeId(prefix = 'id') {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
 }
 
+function normalizeEvent(event) {
+  return {
+    ...event,
+    attendees: Array.isArray(event?.attendees) ? event.attendees : [],
+    capacity: Number(event?.capacity || 0),
+    notification: event?.notification || '',
+  };
+}
+
 function formatTimeAgo(dateString) {
   const diff = Math.max(1, Math.round((Date.now() - new Date(dateString).getTime()) / 60000));
   return `${diff} min ago`;
@@ -146,6 +171,15 @@ function normalizeOrderStatus(status) {
 function normalizeOrder(order) {
   const table = order?.table === 'Walk-in' || order?.table == null ? order?.table : String(order?.table);
   return { ...order, table, status: normalizeOrderStatus(order?.status) };
+}
+
+function normalizeOrders(orders) {
+  const seen = new Set();
+  return (Array.isArray(orders) ? orders : []).map(normalizeOrder).filter((order) => {
+    if (!order.id || seen.has(order.id)) return false;
+    seen.add(order.id);
+    return Array.isArray(order.items) && order.items.length > 0;
+  });
 }
 
 function getLocalDateInputValue(date = new Date()) {
@@ -206,6 +240,59 @@ function getWaiterShiftStats(orders) {
   };
 }
 
+function EventView({ settings, events, onEventsChange }) {
+  const [selectedEventId, setSelectedEventId] = useState(events[0]?.id || '');
+  const [name, setName] = useState('');
+  const [contact, setContact] = useState('');
+  const [message, setMessage] = useState('');
+  const selectedEvent = events.find((event) => event.id === selectedEventId) || events[0];
+  const registrations = readStorage('coffee-menu-event-registrations-v1', {});
+  const alreadyJoined = selectedEvent && registrations[selectedEvent.id];
+
+  const joinEvent = () => {
+    if (!selectedEvent || !name.trim() || !contact.trim()) {
+      setMessage('Enter your name and phone or Instagram.');
+      return;
+    }
+    if (selectedEvent.capacity && selectedEvent.attendees.length >= selectedEvent.capacity) {
+      setMessage('This event is full.');
+      return;
+    }
+    const attendee = { id: makeId('attendee'), name: name.trim(), contact: contact.trim(), joinedAt: new Date().toISOString() };
+    onEventsChange(events.map((event) => event.id === selectedEvent.id ? { ...event, attendees: [...event.attendees, attendee] } : event));
+    writeStorage('coffee-menu-event-registrations-v1', { ...registrations, [selectedEvent.id]: attendee.id });
+    setMessage('You joined the event.');
+    setName('');
+    setContact('');
+  };
+
+  return (
+    <div className="admin-shell event-shell">
+      <style>{styles}</style>
+      <header className="admin-topbar">
+        <div><h2>Events at {settings.name}</h2><small>Join an event and receive updates here.</small></div>
+        <button className="ghost-btn" onClick={() => window.location.hash = ''}>Customer view</button>
+      </header>
+      {events.length === 0 ? <div className="admin-card empty-state">No upcoming events yet.</div> : (
+        <div className="event-layout">
+          <div className="event-list">
+            {events.map((event) => <button key={event.id} type="button" className={selectedEvent?.id === event.id ? 'event-list-item active' : 'event-list-item'} onClick={() => setSelectedEventId(event.id)}><strong>{event.title}</strong><span>{event.date} · {event.time}</span></button>)}
+          </div>
+          {selectedEvent && <section className="admin-card event-detail-card">
+            <h3>{selectedEvent.title}</h3>
+              {selectedEvent.backgroundImage && <img className="event-cover-image" src={selectedEvent.backgroundImage} alt="" />}
+            <p>{selectedEvent.details || 'Join us for a special event at THE RISE.'}</p>
+            <div className="event-meta"><span>Date: {selectedEvent.date}</span><span>Time: {selectedEvent.time}</span><span>Location: {selectedEvent.location || settings.name}</span><span>{selectedEvent.attendees.length}{selectedEvent.capacity ? ` / ${selectedEvent.capacity}` : ''} joined</span></div>
+            {selectedEvent.notification && <div className="form-message"><strong>Update:</strong> {selectedEvent.notification}</div>}
+            {alreadyJoined ? <div className="form-message">You are registered for this event.</div> : <div className="event-join-form"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" /><input value={contact} onChange={(event) => setContact(event.target.value)} placeholder="Phone or Instagram" /><button className="primary-btn" onClick={joinEvent}>Join event</button></div>}
+            {message && <small className="form-message">{message}</small>}
+          </section>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrder, onSubmitFeedback }) {
   const [query, setQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState('all');
@@ -221,6 +308,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
   const customerOrders = orders
     .map(normalizeOrder)
     .filter((order) => order.status !== 'Cancelled')
+    .filter((order) => order.customerCleared !== true)
     .filter((order) => table
       ? String(order.table) === String(table)
       : customerOrderIds.includes(order.id))
@@ -302,6 +390,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
       prepMinutes: totalPrep,
       createdAt: new Date().toISOString(),
       status: 'New',
+      source: 'qr',
     };
     try {
       const savedOrder = await onPlaceOrder(order);
@@ -337,6 +426,7 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
             </div>
           </div>
           <div className="header-actions">
+            <button className="event-toggle" onClick={() => window.location.hash = 'events'}>Events</button>
             <button className="waiter-toggle" onClick={() => window.location.hash = 'waiter'}>Waiter</button>
             <button className="admin-toggle" onClick={() => window.location.hash = 'admin'}>Admin</button>
           </div>
@@ -444,9 +534,9 @@ function CustomerView({ settings, groups, products, orders, feedback, onPlaceOrd
             </svg>
             <span>Website by @neder_shh</span>
           </a>
-          <a className="social-link location-link" href={COFFEE_LOCATION_URL} target="_blank" rel="noreferrer">
+          <a className="social-link location-link" href={settings.locationUrl || COFFEE_LOCATION_URL} target="_blank" rel="noreferrer">
             <span className="social-icon" aria-hidden="true">⌖</span>
-            <span>Find us at the coffee shop</span>
+            <span>{settings.locationName || 'Find us at the coffee shop'}</span>
           </a>
           {settings.facebookUrl && (
             <a className="social-link facebook-link" href={settings.facebookUrl} target="_blank" rel="noreferrer" aria-label="Open the coffee shop Facebook page">
@@ -635,13 +725,65 @@ function WaiterAuth({ waiters, onUnlock, error }) {
   );
 }
 
-function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warningMessage }) {
+function WaiterView({ waiterName, settings, groups, products, orders, onPlaceOrder, onOrderStatusChange, onClearTable, warningMessage }) {
+  const [manualTable, setManualTable] = useState('');
+  const [manualGroupId, setManualGroupId] = useState(groups[0]?.id || '');
+  const [manualProductId, setManualProductId] = useState(products[0]?.id || '');
+  const [manualQuantity, setManualQuantity] = useState(1);
+  const [manualItems, setManualItems] = useState([]);
+  const [manualMessage, setManualMessage] = useState('');
   const shiftStats = getWaiterShiftStats(orders);
   const activeOrders = orders
     .map(normalizeOrder)
     .filter((order) => !['Served', 'Cancelled'].includes(order.status))
     .slice()
     .reverse();
+  const manualProducts = products.filter((product) => product.groupId === manualGroupId && product.available !== false);
+  const manualTotal = manualItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  useEffect(() => {
+    if (!manualProducts.some((product) => product.id === manualProductId)) {
+      setManualProductId(manualProducts[0]?.id || '');
+    }
+  }, [manualGroupId, products]);
+
+  const addManualItem = () => {
+    const product = products.find((item) => item.id === manualProductId);
+    if (!product) return;
+    const quantity = Math.max(1, Number(manualQuantity) || 1);
+    setManualItems((current) => {
+      const existing = current.find((item) => item.id === product.id);
+      return existing
+        ? current.map((item) => item.id === product.id ? { ...item, qty: item.qty + quantity } : item)
+        : [...current, { id: product.id, name: product.name, qty: quantity, price: Number(product.price || 0), prepTime: Number(product.prepTime || 5) }];
+    });
+    setManualQuantity(1);
+  };
+
+  const submitManualOrder = async () => {
+    if (!manualItems.length) {
+      setManualMessage('Add at least one product first.');
+      return;
+    }
+    const table = manualTable.trim() || 'Walk-in';
+    const order = {
+      id: makeId('order'),
+      table,
+      items: manualItems,
+      total: manualTotal,
+      prepMinutes: manualItems.reduce((sum, item) => sum + item.prepTime * item.qty, 0),
+      createdAt: new Date().toISOString(),
+      status: 'Received',
+    };
+    try {
+      await onPlaceOrder(order);
+      setManualItems([]);
+      setManualTable('');
+      setManualMessage('Manual order added.');
+    } catch {
+      setManualMessage('Could not add the manual order.');
+    }
+  };
 
   return (
     <div className="admin-shell">
@@ -667,6 +809,34 @@ function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warning
         <div className="stat-box"><small>Shift orders</small><strong>{shiftStats.orders}</strong></div>
       </div>
 
+      <section className="admin-card waiter-orders-card manual-order-card">
+        <div className="section-title-row">
+          <div>
+            <h3>Manual order</h3>
+            <small>Add an order for a customer without a phone.</small>
+          </div>
+          <strong>{settings.currency}{manualTotal.toFixed(2)}</strong>
+        </div>
+        <div className="manual-order-form">
+          <input value={manualTable} onChange={(event) => setManualTable(event.target.value)} placeholder="Table number or Walk-in" />
+          <select value={manualGroupId} onChange={(event) => setManualGroupId(event.target.value)} aria-label="Manual order group">
+            {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+          </select>
+          <select value={manualProductId} onChange={(event) => setManualProductId(event.target.value)} aria-label="Manual order product">
+            {manualProducts.map((product) => <option key={product.id} value={product.id}>{product.name} · {settings.currency}{Number(product.price || 0).toFixed(2)}</option>)}
+          </select>
+          <input type="number" min="1" value={manualQuantity} onChange={(event) => setManualQuantity(event.target.value)} aria-label="Quantity" />
+          <button className="ghost-btn" onClick={addManualItem} type="button">Add item</button>
+        </div>
+        {manualItems.length > 0 && (
+          <div className="manual-item-list">
+            {manualItems.map((item) => <div key={item.id}><span>{item.qty} x {item.name}</span><strong>{settings.currency}{(item.qty * item.price).toFixed(2)}</strong></div>)}
+          </div>
+        )}
+        <button className="primary-btn" onClick={submitManualOrder} type="button">Send manual order</button>
+        {manualMessage && <small className="form-message">{manualMessage}</small>}
+      </section>
+
       <section className="admin-card waiter-orders-card">
         <div className="section-title-row"><h3>Incoming orders</h3><span>{activeOrders.length} active</span></div>
         {activeOrders.length === 0 ? <div className="empty-state">No active orders right now.</div> : (
@@ -691,6 +861,7 @@ function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warning
                         <option value="Cancelled">Cancelled</option>
                       </select>
                     )}
+                    <button className="ghost-btn" onClick={() => onClearTable(order.table)} type="button">Clear table / Next customer</button>
                   </div>
                 </div>
               </div>
@@ -702,7 +873,7 @@ function WaiterView({ waiterName, settings, orders, onOrderStatusChange, warning
   );
 }
 
-function AdminView({ settings, groups, products, orders, feedback, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onOrdersChange, onSubmitFeedback, warningMessage }) {
+function AdminView({ settings, groups, products, orders, feedback, events, onSettingsChange, onGroupsChange, onProductsChange, onOrderStatusChange, onOrdersChange, onEventsChange, onSubmitFeedback, warningMessage }) {
   const [draftSettings, setDraftSettings] = useState(settings);
   const [draftGroupName, setDraftGroupName] = useState('');
   const [draftProduct, setDraftProduct] = useState({ name: '', groupId: groups[0]?.id || '', price: 0, emoji: '☕', image: '', details: '', prepTime: 5, available: true });
@@ -720,6 +891,11 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
   const [newQrLink, setNewQrLink] = useState('');
   const [productDrafts, setProductDrafts] = useState({});
   const [selectedOrderDetailId, setSelectedOrderDetailId] = useState(null);
+  const [activeAdminSection, setActiveAdminSection] = useState('dashboard');
+  const [eventDraft, setEventDraft] = useState({ title: '', date: '', time: '', location: '', details: '', capacity: 0, backgroundImage: '' });
+  const [eventNotification, setEventNotification] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState(events[0]?.id || '');
+  const selectedEvent = events.find((event) => event.id === selectedEventId) || events[0];
   const [groupStyleDraft, setGroupStyleDraft] = useState({
     backgroundColor: groups[0]?.backgroundColor || '#f4efe8',
     backgroundImage: groups[0]?.backgroundImage || '',
@@ -986,6 +1162,40 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
     setDraftSettings((current) => ({ ...current, customQrCodes: (current.customQrCodes || []).filter((qr) => qr.id !== qrId) }));
   };
 
+  const addEvent = () => {
+    if (!eventDraft.title.trim() || !eventDraft.date) return;
+    const event = normalizeEvent({ ...eventDraft, id: makeId('event'), title: eventDraft.title.trim(), attendees: [] });
+    onEventsChange([...events, event]);
+    setSelectedEventId(event.id);
+    setEventDraft({ title: '', date: '', time: '', location: '', details: '', capacity: 0, backgroundImage: '' });
+  };
+
+  const updateEvent = (patch) => {
+    if (!selectedEvent) return;
+    onEventsChange(events.map((event) => event.id === selectedEvent.id ? { ...event, ...patch } : event));
+  };
+
+  const removeEvent = () => {
+    if (!selectedEvent || !window.confirm(`Remove ${selectedEvent.title}?`)) return;
+    onEventsChange(events.filter((event) => event.id !== selectedEvent.id));
+    setSelectedEventId('');
+  };
+
+  const removeAttendee = (attendeeId) => updateEvent({ attendees: selectedEvent.attendees.filter((attendee) => attendee.id !== attendeeId) });
+
+  const sendEventNotification = () => {
+    if (!selectedEvent || !eventNotification.trim()) return;
+    updateEvent({ notification: eventNotification.trim(), notificationSentAt: new Date().toISOString() });
+    setEventNotification('');
+  };
+  const handleEventImageUpload = (event, updateDraft) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => updateDraft(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsDataURL(file);
+  };
   return (
     <div className="admin-shell">
       <style>{styles}</style>
@@ -1005,8 +1215,31 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
         <button className="ghost-btn" onClick={() => window.location.hash = ''}>Customer view</button>
       </header>
 
+      <nav className="admin-folder-nav" aria-label="Admin sections">
+        {[
+          ['dashboard', 'Dashboard'],
+          ['branding', 'Brand settings'],
+          ['qr', 'Table QR codes'],
+          ['groups', 'Menu groups'],
+          ['products', 'Products'],
+          ['events', 'Events'],
+          ['orders', 'Orders'],
+          ['reviews', 'Reviews'],
+        ].map(([section, label]) => (
+          <button
+            key={section}
+            className={activeAdminSection === section ? 'admin-folder active' : 'admin-folder'}
+            onClick={() => setActiveAdminSection(section)}
+            type="button"
+          >
+            <span className="admin-folder-icon">{activeAdminSection === section ? '▾' : '▸'}</span>
+            {label}
+          </button>
+        ))}
+      </nav>
+
       <div className="admin-grid">
-        <section className="admin-card dashboard-card wide-card">
+        <section className="admin-card dashboard-card wide-card" hidden={activeAdminSection !== 'dashboard'}>
           <div className="section-title-row">
             <div>
               <h3>Sales dashboard</h3>
@@ -1033,7 +1266,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           <button className="danger-btn dashboard-delete-btn" onClick={deleteSelectedPeriodOrders} disabled={!salesStats.orderCount}>Delete selected period orders</button>
         </section>
 
-        <section className="admin-card">
+        <section className="admin-card" hidden={activeAdminSection !== 'branding'}>
           <div className="section-title-row">
             <h3>Brand settings</h3>
             <span>⭐ {avgRating}/5</span>
@@ -1046,6 +1279,8 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
             <label>Logo text<input value={draftSettings.logoText} onChange={(e) => setDraftSettings({ ...draftSettings, logoText: e.target.value })} /></label>
             <label>Logo image URL<input value={draftSettings.logoUrl} onChange={(e) => setDraftSettings({ ...draftSettings, logoUrl: e.target.value })} /></label>
             <label>Upload logo photo<input type="file" accept="image/*" onChange={handleLogoImageUpload} /></label>
+            <label>Location name or address<input value={draftSettings.locationName || ''} onChange={(e) => setDraftSettings({ ...draftSettings, locationName: e.target.value })} placeholder="The RISE Coffee & More" /></label>
+            <label>Google Maps location URL<input value={draftSettings.locationUrl || ''} onChange={(e) => setDraftSettings({ ...draftSettings, locationUrl: e.target.value })} placeholder="https://maps.google.com/..." /></label>
             <label>Waiter name<input value={draftSettings.waiterName || ''} onChange={(e) => setDraftSettings({ ...draftSettings, waiterName: e.target.value })} /></label>
             <label>Waiter password<input type="password" value={draftSettings.waiterPassword || ''} onChange={(e) => setDraftSettings({ ...draftSettings, waiterPassword: e.target.value })} /></label>
             <label>Website owner Instagram
@@ -1081,7 +1316,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           </div>
         </section>
 
-        <section className="admin-card">
+        <section className="admin-card" hidden={activeAdminSection !== 'qr'}>
           <h3>Table QR codes</h3>
           <div className="qr-grid">
             {Array.from({ length: 20 }, (_, index) => {
@@ -1118,7 +1353,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           </div>
         </section>
 
-        <section className="admin-card">
+        <section className="admin-card" hidden={activeAdminSection !== 'groups'}>
           <h3>Groups</h3>
           <div className="field-row">
             <input value={draftGroupName} onChange={(e) => setDraftGroupName(e.target.value)} placeholder="Add a new menu group" />
@@ -1146,7 +1381,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           </ul>
         </section>
 
-        <section className="admin-card wide-card">
+        <section className="admin-card wide-card" hidden={activeAdminSection !== 'products'}>
           <h3>Products</h3>
           <div className="product-form-grid">
             <input placeholder="Product name" value={draftProduct.name} onChange={(e) => setDraftProduct({ ...draftProduct, name: e.target.value })} />
@@ -1189,8 +1424,43 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           </div>
         </section>
 
+        <section className="admin-card wide-card" hidden={activeAdminSection !== 'events'}>
+          <div className="section-title-row"><div><h3>Events</h3><small>Create events, manage attendees, and send updates.</small></div><span>{events.length} events</span></div>
+          <div className="event-admin-create">
+            <input placeholder="Event name" value={eventDraft.title} onChange={(event) => setEventDraft({ ...eventDraft, title: event.target.value })} />
+            <input type="date" value={eventDraft.date} onChange={(event) => setEventDraft({ ...eventDraft, date: event.target.value })} />
+            <input type="time" value={eventDraft.time} onChange={(event) => setEventDraft({ ...eventDraft, time: event.target.value })} />
+            <input placeholder="Location" value={eventDraft.location} onChange={(event) => setEventDraft({ ...eventDraft, location: event.target.value })} />
+            <input type="number" min="0" placeholder="Capacity (0 = unlimited)" value={eventDraft.capacity} onChange={(event) => setEventDraft({ ...eventDraft, capacity: Number(event.target.value) })} />
+            <label>Event background<input type="file" accept="image/*" onChange={(event) => handleEventImageUpload(event, (backgroundImage) => setEventDraft({ ...eventDraft, backgroundImage }))} /></label>
+            <textarea placeholder="Details" value={eventDraft.details} onChange={(event) => setEventDraft({ ...eventDraft, details: event.target.value })} />
+            <button className="primary-btn" onClick={addEvent}>Add event</button>
+          </div>
+          {events.length > 0 && <div className="event-admin-layout">
+            <div className="event-list">{events.map((event) => <button key={event.id} type="button" className={selectedEvent?.id === event.id ? 'event-list-item active' : 'event-list-item'} onClick={() => setSelectedEventId(event.id)}><strong>{event.title}</strong><span>{event.date} · {event.attendees.length} joined</span></button>)}</div>
+            {selectedEvent && <div className="event-admin-detail">
+              <div className="settings-grid">
+                <label>Event name<input value={selectedEvent.title} onChange={(event) => updateEvent({ title: event.target.value })} /></label>
+                <label>Date<input type="date" value={selectedEvent.date} onChange={(event) => updateEvent({ date: event.target.value })} /></label>
+                <label>Time<input type="time" value={selectedEvent.time} onChange={(event) => updateEvent({ time: event.target.value })} /></label>
+                <label>Location<input value={selectedEvent.location || ''} onChange={(event) => updateEvent({ location: event.target.value })} /></label>
+                <label>Capacity<input type="number" min="0" value={selectedEvent.capacity || 0} onChange={(event) => updateEvent({ capacity: Number(event.target.value) })} /></label>
+                <label>Replace background<input type="file" accept="image/*" onChange={(event) => handleEventImageUpload(event, (backgroundImage) => updateEvent({ backgroundImage }))} /></label>
+                <label>Details<textarea value={selectedEvent.details || ''} onChange={(event) => updateEvent({ details: event.target.value })} /></label>
+              </div>
+              {selectedEvent.backgroundImage && <div className="event-image-preview"><img src={selectedEvent.backgroundImage} alt="Event background preview" /><button className="ghost-btn" onClick={() => updateEvent({ backgroundImage: '' })}>Remove background image</button></div>}
+              <div className="event-admin-actions"><button className="danger-btn" onClick={removeEvent}>Remove event</button></div>
+              <h4>Send notification to joined people</h4>
+              <div className="field-row"><input value={eventNotification} onChange={(event) => setEventNotification(event.target.value)} placeholder="Event update or reminder" /><button className="primary-btn" onClick={sendEventNotification}>Send update</button></div>
+              {selectedEvent.notification && <div className="form-message">Current update: {selectedEvent.notification}</div>}
+              <h4>Joined people ({selectedEvent.attendees.length})</h4>
+              {selectedEvent.attendees.length === 0 ? <div className="empty-state">No one has joined yet.</div> : <div className="attendee-list">{selectedEvent.attendees.map((attendee) => <div className="attendee-row" key={attendee.id}><span><strong>{attendee.name}</strong><small>{attendee.contact}</small></span><button className="danger-btn" onClick={() => removeAttendee(attendee.id)}>Remove</button></div>)}</div>}
+            </div>}
+          </div>}
+        </section>
+
         {selectedOrderDetail && (
-          <section className="admin-card wide-card">
+          <section className="admin-card wide-card" hidden={activeAdminSection !== 'orders'}>
             <div className="section-title-row">
               <h3>Order details</h3>
               <button className="ghost-btn" onClick={() => setSelectedOrderDetailId(null)}>Close</button>
@@ -1211,7 +1481,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           </section>
         )}
 
-        <section className="admin-card wide-card">
+        <section className="admin-card wide-card" hidden={activeAdminSection !== 'orders'}>
           <h3>Served orders dashboard</h3>
           {servedOrders.length === 0 ? (
             <div className="empty-state">No served orders yet.</div>
@@ -1247,7 +1517,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           )}
         </section>
 
-        <section className="admin-card wide-card">
+        <section className="admin-card wide-card" hidden={activeAdminSection !== 'orders'}>
           <h3>Orders queue</h3>
           {activeQueueOrders.length === 0 ? (
             <div className="empty-state">No active orders yet.</div>
@@ -1291,7 +1561,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
           )}
         </section>
 
-        <section className="admin-card wide-card">
+        <section className="admin-card wide-card" hidden={activeAdminSection !== 'reviews'}>
           <h3>Reviews</h3>
           {feedback.length === 0 ? (
             <div className="empty-state">No customer review yet.</div>
@@ -1317,7 +1587,7 @@ function AdminView({ settings, groups, products, orders, feedback, onSettingsCha
 export default function App() {
   const [settings, setSettings] = useState(() => {
     const saved = readStorage(STORAGE_KEYS.settings, defaultSettings);
-    return { ...defaultSettings, ...saved, wifiRestrictionEnabled: false };
+    return normalizeSettings(saved);
   });
   const [groups, setGroups] = useState(() => readStorage(STORAGE_KEYS.groups, baseGroups));
   const [products, setProducts] = useState(() => readStorage(STORAGE_KEYS.products, baseProducts.map(([name, groupId, price, emoji, prepTime, details], index) => ({
@@ -1332,6 +1602,7 @@ export default function App() {
   }))));
   const [orders, setOrders] = useState(() => readStorage(STORAGE_KEYS.orders, []));
   const [feedback, setFeedback] = useState(() => readStorage(STORAGE_KEYS.feedback, []));
+  const [events, setEvents] = useState(() => readStorage(STORAGE_KEYS.events, []).map(normalizeEvent));
   const [isAdmin, setIsAdmin] = useState(false);
   const [authError, setAuthError] = useState('');
   const [currentView, setCurrentView] = useState('customer');
@@ -1355,11 +1626,29 @@ export default function App() {
       .then((data) => {
         if (!mounted) return;
 
-        if (data?.settings) setSettings({ ...defaultSettings, ...data.settings, wifiRestrictionEnabled: false });
+        if (data?.settings) setSettings(normalizeSettings(data.settings));
         if (data?.groups) setGroups(data.groups);
         if (data?.products) setProducts(data.products);
-        if (data?.orders) setOrders(data.orders.map(normalizeOrder));
+        if (data?.orders) setOrders(normalizeOrders(data.orders));
         if (data?.feedback) setFeedback(data.feedback);
+        if (data?.events) setEvents(data.events.map(normalizeEvent));
+
+        if (!readStorage(STORAGE_KEYS.menuImport, false)) {
+          const sharedGroups = data?.groups || baseGroups;
+          setGroups(sharedGroups.map((group) => importedGroupNames[group.id] ? { ...group, name: importedGroupNames[group.id] } : group));
+          setProducts(importedProducts.map(([name, groupId, price], index) => ({
+            id: `menu-${index + 1}`,
+            name,
+            groupId,
+            price,
+            emoji: '☕',
+            image: '',
+            details: '',
+            prepTime: 5,
+            available: true,
+          })));
+          writeStorage(STORAGE_KEYS.menuImport, true);
+        }
         setBackendReady(true);
       })
       .catch(() => {
@@ -1378,7 +1667,7 @@ export default function App() {
     const refreshOrders = () => {
       fetchSharedData()
         .then((data) => {
-          if (data?.orders) setOrders(data.orders.map(normalizeOrder));
+          if (data?.orders) setOrders(normalizeOrders(data.orders));
         })
         .catch(() => {});
     };
@@ -1408,9 +1697,13 @@ export default function App() {
   }, [feedback]);
 
   useEffect(() => {
+    writeStorage(STORAGE_KEYS.events, events);
+  }, [events]);
+
+  useEffect(() => {
     if (!backendReady) return;
 
-    saveSharedData({ settings, groups, products, feedback }).catch(() => {
+    saveSharedData({ settings, groups, products, feedback, events }).catch(() => {
       // fallback silently if backend is unavailable
     });
   }, [settings, groups, products, feedback, backendReady]);
@@ -1418,8 +1711,10 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      const nextView = hash === 'admin' || hash === 'waiter' ? hash : 'customer';
+      const nextView = hash === 'admin' || hash === 'waiter' || hash === 'events' ? hash : 'customer';
       setCurrentView(nextView);
+      if (nextView !== 'admin') setIsAdmin(false);
+      if (nextView !== 'waiter') setIsWaiter(false);
       setAuthError('');
     };
 
@@ -1468,14 +1763,22 @@ export default function App() {
   };
 
   const changeOrderStatus = async (orderId, status) => {
-    setOrders((current) => current.map((order) => (order.id === orderId ? normalizeOrder({ ...order, status }) : normalizeOrder(order))));
+    setOrders((current) => current.map((order) => (order.id === orderId
+      ? normalizeOrder({ ...order, status, customerCleared: status === 'Served' ? true : order.customerCleared })
+      : normalizeOrder(order))));
     try {
       await updateOrderStatus(orderId, status);
     } catch {
       fetchSharedData().then((data) => {
-        if (data?.orders) setOrders(data.orders.map(normalizeOrder));
+        if (data?.orders) setOrders(normalizeOrders(data.orders));
       }).catch(() => {});
     }
+  };
+
+  const clearTableForCustomer = (table) => {
+    setOrders((current) => current.map((order) => String(order.table) === String(table)
+      ? { ...order, customerCleared: true }
+      : order));
   };
 
   const wifiWarningMessage = 'This ordering page works only while connected to the coffee shop Wi-Fi.';
@@ -1505,16 +1808,30 @@ export default function App() {
       products={products}
       orders={orders}
       feedback={feedback}
+      events={events}
       onSettingsChange={setSettings}
       onGroupsChange={setGroups}
       onProductsChange={setProducts}
       onOrderStatusChange={changeOrderStatus}
       onOrdersChange={setOrders}
+      onEventsChange={setEvents}
       onSubmitFeedback={submitFeedback}
       warningMessage={wifiRestricted && networkAllowed === false ? wifiWarningMessage : ''}
     />
+  ) : currentView === 'events' ? (
+    <EventView settings={settings} events={events} onEventsChange={setEvents} />
   ) : currentView === 'waiter' ? (
-    <WaiterView waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName} settings={settings} orders={orders} onOrderStatusChange={changeOrderStatus} warningMessage={wifiRestricted && networkAllowed === false ? wifiWarningMessage : ''} />
+    <WaiterView
+      waiterName={activeWaiter?.name || settings.waiterName || defaultSettings.waiterName}
+      settings={settings}
+      groups={groups}
+      products={products}
+      orders={orders}
+      onPlaceOrder={placeOrder}
+      onOrderStatusChange={changeOrderStatus}
+      onClearTable={clearTableForCustomer}
+      warningMessage={wifiRestricted && networkAllowed === false ? wifiWarningMessage : ''}
+    />
   ) : (
     <CustomerView
       settings={settings}
@@ -1637,6 +1954,30 @@ const styles = `
   .admin-shell { min-height: 100vh; padding: 20px 18px 40px; background: #f5f2eb; }
   .admin-topbar { max-width: 1400px; margin: 0 auto 18px; display: flex; justify-content: space-between; align-items: center; }
   .admin-topbar h2 { margin: 0; }
+  .event-toggle { border: none; border-radius: 12px; padding: 0.85rem 1.2rem; cursor: pointer; font-weight: 700; background: #d9b45f; color: #30240e; }
+  .admin-folder-nav { max-width: 1400px; margin: 0 auto 20px; display: flex; gap: 8px; flex-wrap: wrap; padding: 8px; border: 1px solid rgba(24,42,27,0.1); border-radius: 16px; background: rgba(255,255,255,0.62); }
+  .admin-folder { display: inline-flex; align-items: center; gap: 7px; padding: 0.7rem 0.9rem; border: 1px solid transparent; border-radius: 10px; color: #304333; background: transparent; font-weight: 700; }
+  .admin-folder:hover { background: rgba(126,168,107,0.12); }
+  .admin-folder.active { border-color: rgba(126,168,107,0.35); color: #18301c; background: #dfead7; }
+  .admin-folder-icon { width: 1rem; font-size: 0.95rem; }
+  .event-layout, .event-admin-layout { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: minmax(210px, 0.35fr) minmax(0, 1fr); gap: 20px; }
+  .event-list { display: grid; align-content: start; gap: 8px; }
+  .event-list-item { display: grid; gap: 4px; padding: 14px; border: 1px solid rgba(24,42,27,0.1); border-radius: 12px; text-align: left; color: #304333; background: rgba(255,255,255,0.62); cursor: pointer; }
+  .event-list-item span { font-size: 0.82rem; opacity: 0.72; }
+  .event-list-item.active { border-color: #7ea86b; background: #dfead7; }
+  .event-detail-card { min-height: 260px; }
+  .event-meta { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 18px 0; color: rgba(24,42,27,0.75); font-size: 0.9rem; }
+  .event-join-form, .event-admin-create { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .event-admin-create { margin: 16px 0 20px; }
+  .event-admin-create textarea { grid-column: 1 / -1; min-height: 80px; }
+  .event-admin-layout { max-width: none; }
+  .event-admin-detail { min-width: 0; }
+  .event-admin-detail h4 { margin: 20px 0 10px; }
+  .event-admin-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+  .attendee-list { display: grid; gap: 8px; }
+  .attendee-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(24,42,27,0.05); }
+  .attendee-row span { display: grid; gap: 3px; }
+  .attendee-row small { opacity: 0.72; }
   .admin-grid { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
   .admin-card { padding: 18px; }
   .wide-card { grid-column: span 2; }
@@ -1658,6 +1999,10 @@ const styles = `
   .waiter-orders-card { max-width: 1400px; margin: 0 auto; }
   .waiter-order-buttons { display: flex; gap: 8px; }
   .waiter-order-buttons button { padding: 0.6rem 0.8rem; }
+  .manual-order-card { margin: 0 auto 20px; }
+  .manual-order-form { display: grid; grid-template-columns: minmax(130px, 0.8fr) minmax(140px, 1fr) minmax(180px, 1.4fr) 90px auto; gap: 8px; margin-top: 14px; }
+  .manual-item-list { display: grid; gap: 6px; margin: 14px 0; padding: 10px 12px; border-radius: 12px; background: rgba(24,42,27,0.05); }
+  .manual-item-list div { display: flex; justify-content: space-between; gap: 12px; }
   .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 14px; }
   .settings-grid label { display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; color: rgba(24,42,27,0.85); }
   .field-help { display: block; margin-top: -6px; color: rgba(24,42,27,0.62); font-size: 0.8rem; }
@@ -1715,8 +2060,11 @@ const styles = `
     .hero-inner, .admin-topbar { align-items: flex-start; flex-direction: column; }
     .header-actions { width: 100%; }
     .header-actions button { flex: 1; }
+    .admin-folder-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .admin-folder { justify-content: flex-start; }
     .waiter-summary { grid-template-columns: 1fr; }
     .order-actions { align-items: flex-start; flex-direction: column; }
-    .field-row, .waiter-row { display: grid; grid-template-columns: 1fr; }
+    .field-row, .waiter-row, .manual-order-form, .event-layout, .event-admin-layout, .event-admin-create, .event-join-form { display: grid; grid-template-columns: 1fr; }
+    .event-admin-create textarea { grid-column: auto; }
   }
 `;
